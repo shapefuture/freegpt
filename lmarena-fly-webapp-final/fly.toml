@@ -1,4 +1,5 @@
-app = "your-lmarena-app-name-final"
+# Replace the value below with your unique Fly.io app name before deploying!
+app = "REPLACE_WITH_YOUR_UNIQUE_FLYIO_APP_NAME"
 primary_region = "iad"
 
 [build]
