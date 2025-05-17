@@ -1,0 +1,17 @@
+body { font-family: sans-serif; margin: 0; background-color: #f4f4f4; display: flex; justify-content: center; padding-top: 20px; }
+.container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 90%; max-width: 1000px; }
+.settings label, .chat-area label { display: block; margin-top: 10px; margin-bottom: 5px; }
+textarea, input[type="text"] { width: calc(100% - 20px); padding: 8px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+textarea#userPrompt { height: 80px; }
+button { padding: 10px 15px; margin-right: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+button:hover { background-color: #0056b3; }
+#retryActionButton { background-color: #ffc107; color: black; }
+.status-area { margin-top: 15px; padding: 10px; background-color: #e9ecef; border-radius: 4px; min-height: 20px; }
+.responses { display: flex; justify-content: space-between; margin-top: 20px; }
+.response-column { width: 48%; }
+.response-box { border: 1px solid #eee; padding: 10px; min-height: 150px; background-color: #f9f9f9; white-space: pre-wrap; overflow-y: auto; max-height: 400px; border-radius: 4px; }
+.message-history { border: 1px solid #eee; padding: 10px; min-height: 100px; background-color: #fdfdfd; white-space: pre-wrap; overflow-y: auto; max-height: 300px; margin-bottom: 10px; border-radius: 4px;}
+.user-message { text-align: right; margin-bottom: 5px; }
+.user-message span { background-color: #007bff; color: white; padding: 8px 12px; border-radius: 15px 15px 0 15px; display: inline-block; }
+.assistant-message { text-align: left; margin-bottom: 5px; }
+.assistant-message span { background-color: #e9ecef; color: #333; padding: 8px 12px; border-radius: 15px 15px 15px 0; display: inline-block; }

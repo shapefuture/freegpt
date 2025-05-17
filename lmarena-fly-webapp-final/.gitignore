@@ -1,0 +1,8 @@
+node_modules/
+.env
+npm-debug.log
+*.log
+# Mac specific
+.DS_Store
+# Fly.io specific (if any local build artifacts)
+fly.lock

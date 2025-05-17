@@ -1,0 +1,20 @@
+{
+  "name": "lmarena-fly-webapp-final",
+  "version": "1.0.0",
+  "description": "LMArena Custom Interface (Fly.io Hosted Web App with User CAPTCHA Fallback)",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "express": "^4.18.2",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}
