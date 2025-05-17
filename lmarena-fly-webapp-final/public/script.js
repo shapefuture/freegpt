@@ -8,9 +8,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const newConversationButton = document.getElementById('newConversationButton');
     const retryActionButton = document.getElementById('retryActionButton');
     const statusAreaEl = document.getElementById('statusArea');
+    const loadingSpinner = document.getElementById('loadingSpinner');
     const modelAResponseEl = document.getElementById('modelAResponse');
     const modelBResponseEl = document.getElementById('modelBResponse');
     const messageHistoryEl = document.getElementById('messageHistory');
+
+    // Dynamic Model Selectors
+    async function fetchModelsAndPopulate() {
+        loadingSpinner.style.display = "inline";
+        try {
+            const resp = await fetch('/api/models');
+            if (!resp.ok) throw new Error("Failed to load model list");
+            const data = await resp.json();
+            const models = (data.models || []).map(m => m.id);
+
+            [modelAIdEl, modelBIdEl].forEach(selectEl => {
+                selectEl.innerHTML = '';
+                models.forEach(modelId => {
+                    const opt = document.createElement('option');
+                    opt.value = modelId;
+                    opt.textContent = modelId;
+                    selectEl.appendChild(opt);
+                });
+            });
+        } catch (e) {
+            [modelAIdEl, modelBIdEl].forEach(selectEl => {
+                selectEl.innerHTML = '';
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'Unavailable';
+                selectEl.appendChild(opt);
+            });
+            statusAreaEl.textContent = "⚠️ Could not load models. Please try again later.";
+        } finally {
+            loadingSpinner.style.display = "none";
+        }
+    }
+
+    fetchModelsAndPopulate();
 
     let clientConversationId = null;
     let clientMessagesHistory = [];
@@ -55,13 +90,29 @@ document.addEventListener('DOMContentLoaded', () => {
     sendButton.addEventListener('click', async () => {
         console.debug('[DEBUG] Send button clicked');
         const userPrompt = userPromptEl.value.trim();
+        const modelA = modelAIdEl.value;
+        const modelB = modelBIdEl.value;
+        const sysPrompt = systemPromptEl.value.trim();
+
+        // Input validation
         if (!userPrompt) {
             statusAreaEl.textContent = 'User prompt cannot be empty.';
-            console.warn('[WARN] Empty user prompt');
+            userPromptEl.focus();
+            return;
+        }
+        if (!modelA) {
+            statusAreaEl.textContent = 'Please select Model A.';
+            modelAIdEl.focus();
+            return;
+        }
+        if (!sysPrompt) {
+            statusAreaEl.textContent = 'System prompt cannot be empty.';
+            systemPromptEl.focus();
             return;
         }
 
         sendButton.disabled = true;
+        loadingSpinner.style.display = 'inline';
         retryActionButton.style.display = 'none';
         modelAResponseEl.textContent = '';
         modelBResponseEl.textContent = '';
@@ -72,9 +123,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const payload = {
             userPrompt,
-            systemPrompt: systemPromptEl.value.trim(),
-            targetModelA: modelAIdEl.value.trim(),
-            targetModelB: modelBIdEl.value.trim(),
+            systemPrompt: sysPrompt,
+            targetModelA: modelA,
+            targetModelB: modelB,
             clientConversationId: clientConversationId,
             clientMessagesHistory: clientMessagesHistory.slice(0, -1)
         };
@@ -165,6 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
             statusAreaEl.textContent = `Error: ${error.message}`;
         } finally {
             sendButton.disabled = false;
+            loadingSpinner.style.display = 'none';
             console.debug('[DEBUG] Send button handler complete');
         }
     });

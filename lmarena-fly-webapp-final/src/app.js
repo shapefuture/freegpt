@@ -1,11 +1,42 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const helmet = require('helmet');
+const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const winston = require('winston');
 const { log, generateUUID, verboseEntry, verboseExit } = require('./utils');
 const puppeteerManager = require('./puppeteerManager');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+
+// Winston file logger for production
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.File({ filename: 'logs/app.log' })
+  ]
+});
+
+// Runtime ENV validation
+const REQUIRED_ENV_VARS = ['LMARENA_URL', 'PORT'];
+REQUIRED_ENV_VARS.forEach((envKey) => {
+  if (!process.env[envKey]) {
+    log('WARN', `Missing environment variable: ${envKey}`);
+    logger.warn({ message: `Missing environment variable: ${envKey}` });
+  }
+});
+
+// Security & CORS
+app.use(helmet());
+app.use(cors({ origin: '*' }));
+app.use(rateLimit({ windowMs: 10 * 60 * 1000, max: 100 }));
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -104,6 +135,41 @@ app.post('/api/trigger-retry', (req, res) => {
         res.status(404).json({ error: 'No active action waiting for retry, or request ID mismatched.' });
         verboseExit('POST /api/trigger-retry', "No resolver found for this requestId");
     }
+});
+
+// API: Dynamic Model List
+app.get('/api/models', async (req, res) => {
+  verboseEntry('GET /api/models', {});
+  try {
+    const page = await puppeteerManager.launchOrGetPage();
+    const models = await puppeteerManager.fetchAvailableModels(page, (data) => log('INFO', '/api/models sseSend', data));
+    res.json({ models });
+  } catch (e) {
+    log('ERROR', 'Error in /api/models:', e.message);
+    res.status(500).json({ error: 'Failed to fetch models' });
+  }
+});
+
+// Health check endpoint
+app.get('/healthz', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
+// Fallback for non-API 404s
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'API endpoint not found' });
+  res.status(404).sendFile(path.join(__dirname, '..', 'public', '404.html'));
+});
+
+// Express error handler
+app.use((err, req, res, next) => {
+  log('ERROR', 'Express error handler', err.stack || err);
+  logger.error({ message: err.message, stack: err.stack, url: req.url });
+  if (req.path.startsWith('/api/')) {
+    res.status(500).json({ error: 'Internal server error' });
+  } else {
+    res.status(500).sendFile(path.join(__dirname, '..', 'public', '500.html'));
+  }
 });
 
 app.listen(PORT, () => {
