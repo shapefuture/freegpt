@@ -1,118 +1,116 @@
-# puppeteer-extra [![Downloads](https://img.shields.io/endpoint?style=social&url=https://runkit.io/fezvrasta/combined-npm-downloads/1.0.0?packages=puppeteer-extra,puppeteer-extra-plugin,puppeteer-extra-plugin-stealth,puppeteer-extra-plugin-recaptcha,puppeteer-extra-plugin-adblocker)](https://github.com/berstend/puppeteer-extra/)
+# LMArena Fly Webapp Final
 
-This is the monorepo for [`puppeteer-extra`](./packages/puppeteer-extra), a modular plugin framework for [`puppeteer`](https://github.com/puppeteer/puppeteer). :-)
+A minimalist, Apple-inspired, production-ready Node.js webapp for LMArena model comparison, with dynamic model selectors, robust security, logging, accessibility, and full test/lint coverage.
 
-🌟 **For the main documentation, please head over to the [`puppeteer-extra`](./packages/puppeteer-extra) package.**
+---
 
-We've also recently introduced support for Playwright, if you're interested in that head over to [`playwright-extra`](./packages/playwright-extra).
+## Features
 
-## Monorepo
+- **Dynamic Model Selection**: UI fetches available models from `/api/models` (via Puppeteer UI scraping & fallback).
+- **Express Backend**: `/api/chat`, `/api/models`, `/api/trigger-retry`, `/healthz` endpoints.
+- **CAPTCHA fallback**: User-in-the-loop when Cloudflare/Turnstile challenge detected.
+- **Security**: Helmet, CORS, rate limiting, production logging.
+- **Accessibility**: Full ARIA, keyboard and mobile support, clean error handling.
+- **Testing & Linting**: Jest, Supertest, ESLint, and Prettier.
+- **Docker/Fly.io Ready**: Deploy with one command, includes `.env.example`.
 
-<details>
- <summary><strong>Contributing</strong></summary>
+---
 
-### Contributing
+## Usage
 
-PRs and new plugins are welcome! The plugin API for `puppeteer-extra` is clean and fun to use. Have a look the [`PuppeteerExtraPlugin`](./packages/puppeteer-extra-plugin) base class documentation to get going and check out the [existing plugins](./packages/) (minimal example is the [anonymize-ua](./packages/puppeteer-extra-plugin-anonymize-ua/index.js) plugin) for reference.
+1. **Install dependencies**
 
-We use a [monorepo](https://github.com/berstend/puppeteer-extra) powered by [Lerna](https://github.com/lerna/lerna#--use-workspaces) (and yarn workspaces), [ava](https://github.com/avajs/ava) for testing, the [standard](https://standardjs.com/) style for linting and [JSDoc](http://usejsdoc.org/about-getting-started.html) heavily to auto-generate markdown [documentation](https://github.com/documentationjs/documentation) based on code. :-)
+   ```
+   npm install
+   ```
 
-</details>
+2. **Configure environment**
 
-<details>
- <summary><strong>Lerna</strong></summary>
+   - Copy `.env.example` to `.env` and fill in values if needed.
 
-### Lerna
+3. **Development**
 
-This monorepo is powered by [Lerna](https://github.com/lerna/lerna) and yarn workspaces.
+   ```
+   npm run dev
+   ```
 
-#### Initial setup
+   Visit [http://localhost:3001](http://localhost:3001).
 
-```bash
-# Install deps
-yarn
+4. **Production**
 
-# Bootstrap the packages in the current Lerna repo.
-# Installs all of their dependencies and links any cross-dependencies.
-yarn bootstrap
+   ```
+   npm run build
+   npm run start
+   ```
 
-# Build all TypeScript sources
-yarn build
-```
+---
 
-#### Development flow
+## Endpoints
 
-```bash
-# Install debug in all packages
-yarn lerna add debug
+- `GET /api/models` — List available models (scrapes LMArena UI).
+- `POST /api/chat` — Start a model-vs-model chat (SSE stream).
+- `POST /api/trigger-retry` — Retry after CAPTCHA/user action.
+- `GET /healthz` — Health check (for Fly.io/Docker).
+- All static assets and error pages served from `/public`.
 
-# Install fs-extra to puppeteer-extra-plugin-user-data-dir
-yarn lerna add fs-extra --scope=puppeteer-extra-plugin-user-data-dir
+---
 
-# Remove dependency
-# https://github.com/lerna/lerna/issues/833
-yarn lerna exec --concurrency 1 'yarn remove fs-extra; echo 0'
+## Testing
 
-# Run test in all packages
-yarn test
+- **Unit/API**
 
-# Update JSDoc based documentation in markdown files
-yarn docs
+  ```
+  npm run test
+  ```
 
-# Upgrade project wide deps like puppeteer
-# (We keep the devDependency version blurry)
-rm -rf node_modules
-rm -rf yarn.lock
-yarn
-yarn lerna bootstrap
+- **Lint**
 
-# Update deps within packages (interactive)
-yarn lernaupdate
+  ```
+  npm run lint       # Check all code for lint errors/warnings
+  npm run lint:fix   # Auto-fix lintable errors
+  ```
 
-# If in doubt :-(
-yarn lerna exec "rm -f yarn.lock; rm -rf node_modules; echo 0"
-rm -f yarn.lock &&  rm -rf node_modules && yarn cache clean
+- **Format**
 
-# Run tests of specific package
-cd packages/puppeteer-extra-plugin-stealth
-yarn test
+  ```
+  npm run format     # Format all JS files with Prettier
+  npm run prettier:check # Check formatting without changing files
+  ```
 
-# Run tests of specific stealth evasion
-cd packages/puppeteer-extra-plugin-stealth
-yarn ava -v ./evasions/user-agent-override/index.test.js
+- **Unit/API Test**
 
-# Test a local monorepo package in an outside folder as it would've been installed from the registry
-# Change PACKAGE_DIR to the path of this monorepo and PACKAGE to the package you wish to install
-PACKAGE=puppeteer-extra PACKAGE_DIR=/Users/foo/puppeteer-extra/packages && yarn remove $(echo $PACKAGE); true && rm -f $(pwd)/$(echo $PACKAGE)-latest.tgz && yarn --cwd $(echo $PACKAGE_DIR)/$(echo $PACKAGE) pack --filename $(pwd)/$(echo $PACKAGE)-latest.tgz && YARN_CACHE_FOLDER=/tmp/yarn yarn add file:$(pwd)/$(echo $PACKAGE)-latest.tgz && rm -rf /tmp/yarn
-```
+  ```
+  npm run test      # Run all Jest/Supertest unit and API tests with coverage
+  ```
 
-#### Publishing
+- **E2E Browser Test (Playwright)**
 
-```bash
-# make sure you're signed into npm before publishing
-# yarn publishing is broken so lerna uses npm
-npm whoami
+  1. Start the server: `npm run dev` (or ensure running on http://localhost:3001)
+  2. In another terminal:
+  ```
+  npx playwright test
+  ```
+  3. View detailed report with: 
+  ```
+  npx playwright show-report
+  ```
 
-# ensure everything is up2date and peachy
-yarn
-yarn bootstrap
-yarn lerna link
-yarn build
-yarn test
+  > Configure `E2E_BASE_URL` for Playwright if not using localhost:3001.
 
-# Phew, let's publish these packages!
-# - Will publish all changed packages
-# - Will ask for new pkg version per package
-# - Will updated inter-package dependency versions automatically
-yarn lerna publish
+---
 
-# Fix new dependency version symlinks
-yarn bootstrap && yarn lerna link
-```
+## Deployment
 
-</details>
+- Build with Docker or deploy to Fly.io using the included `fly.toml` and Dockerfile.
+- Expects Google Chrome and Puppeteer dependencies for real browser automation.
 
-<br>
-<p align="center">
-  <img src="https://i.imgur.com/EuqiF5F.png"  height="240"  />
-</p>
+---
+
+## Developer Notes
+
+- **Model Selectors**: If the LMArena UI changes, update the selectors in `src/puppeteerManager.js` (see comments).
+- **Analytics**: By default, analytics is stubbed (console log). Integrate your preferred system in `public/script.js`.
+- **Logging**: Production logs are written to `logs/app.log` (via Winston). Customize as needed.
+- **Further Improvements**: See comments in code for optional TypeScript migration, session management, or advanced error handling.
+
+---
