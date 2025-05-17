@@ -1,47 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LMArena Custom Interface</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>LMArena</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>LMArena Custom Interface</h1>
-        
-        <div class="settings">
-            <label for="systemPrompt">System Prompt:</label>
-            <textarea id="systemPrompt" rows="3">You are a helpful AI assistant.</textarea>
-            
-            <label for="modelAId">Target Model A ID:</label>
-            <input type="text" id="modelAId" placeholder="e.g., lmsys/vicuna-7b-v1.5">
-            
-            <label for="modelBId">Target Model B ID (Optional for Battle):</label>
-            <input type="text" id="modelBId" placeholder="e.g., lmsys/fastchat-t5-3b-v1.0">
-        </div>
-
-        <div class="chat-area">
-            <div id="messageHistory" class="message-history"></div>
-            <textarea id="userPrompt" placeholder="Type your prompt here..."></textarea>
-            <button id="sendButton">Send</button>
-            <button id="newConversationButton">New Conversation</button>
-            <button id="retryActionButton" style="display: none;">Retry Action</button>
-        </div>
-
-        <div id="statusArea" class="status-area"></div>
-
-        <div class="responses">
-            <div class="response-column">
-                <h2>Model A Response:</h2>
-                <div id="modelAResponse" class="response-box"></div>
-            </div>
-            <div class="response-column">
-                <h2>Model B Response:</h2>
-                <div id="modelBResponse" class="response-box"></div>
-            </div>
-        </div>
-    </div>
-    <script src="script.js"></script>
+  <main class="container" role="main" aria-label="LMArena Interface">
+    <h1>LMArena</h1>
+    <form class="settings" autocomplete="off" aria-label="Model & Prompt Settings" onsubmit="return false;">
+      <label for="systemPrompt">System Prompt</label>
+      <textarea id="systemPrompt" rows="3" aria-label="System Prompt">You are a helpful AI assistant.</textarea>
+      <label for="modelAId">Target Model A ID</label>
+      <input type="text" id="modelAId" placeholder="lmsys/vicuna-7b-v1.5" aria-label="Target Model A ID">
+      <label for="modelBId">Target Model B ID <span aria-label="Optional">(Optional)</span></label>
+      <input type="text" id="modelBId" placeholder="lmsys/fastchat-t5-3b-v1.0" aria-label="Target Model B ID">
+    </form>
+    <section class="chat-area" aria-label="Chat">
+      <div id="messageHistory" class="message-history" aria-live="polite"></div>
+      <textarea id="userPrompt" placeholder="Type your prompt here..." aria-label="User Prompt"></textarea>
+      <div style="display: flex; gap: 8px;">
+        <button id="sendButton" type="button" aria-label="Send">Send</button>
+        <button id="newConversationButton" type="button" aria-label="New Conversation">New Conversation</button>
+        <button id="retryActionButton" type="button" style="display:none;" aria-label="Retry Action">Retry Action</button>
+      </div>
+    </section>
+    <div id="statusArea" class="status-area" aria-live="polite"></div>
+    <section class="responses" aria-label="Model Responses">
+      <div class="response-column">
+        <h2>Model A</h2>
+        <div id="modelAResponse" class="response-box" aria-live="polite"></div>
+      </div>
+      <div class="response-column">
+        <h2>Model B</h2>
+        <div id="modelBResponse" class="response-box" aria-live="polite"></div>
+      </div>
+    </section>
+  </main>
+  <script src="script.js"></script>
 </body>
 </html>
