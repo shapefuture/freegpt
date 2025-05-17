@@ -74,7 +74,28 @@ A minimalist, Apple-inspired, production-ready Node.js webapp for LMArena model 
 
   ```
   npm run format     # Format all JS files with Prettier
+  npm run prettier:check # Check formatting without changing files
   ```
+
+- **Unit/API Test**
+
+  ```
+  npm run test      # Run all Jest/Supertest unit and API tests with coverage
+  ```
+
+- **E2E Browser Test (Playwright)**
+
+  1. Start the server: `npm run dev` (or ensure running on http://localhost:3001)
+  2. In another terminal:
+  ```
+  npx playwright test
+  ```
+  3. View detailed report with: 
+  ```
+  npx playwright show-report
+  ```
+
+  > Configure `E2E_BASE_URL` for Playwright if not using localhost:3001.
 
 ---
 
