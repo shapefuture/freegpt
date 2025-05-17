@@ -2,17 +2,37 @@
   "env": {
     "browser": true,
     "es2021": true,
-    "node": true
+    "node": true,
+    "jest": true
   },
-  "extends": ["eslint:recommended"],
-  "overrides": [],
+  "extends": [
+    "eslint:recommended",
+    "plugin:node/recommended",
+    "plugin:promise/recommended",
+    "plugin:prettier/recommended"
+  ],
+  "plugins": [
+    "node",
+    "promise",
+    "prettier"
+  ],
   "parserOptions": {
-    "ecmaVersion": 12,
+    "ecmaVersion": 2022,
     "sourceType": "module"
   },
   "rules": {
-    "no-unused-vars": "warn",
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
     "no-console": "off",
-    "no-undef": "warn"
-  }
+    "no-undef": "error",
+    "prettier/prettier": "warn",
+    "node/no-unsupported-features/es-syntax": "off",
+    "node/no-unpublished-require": "off",
+    "promise/catch-or-return": "error",
+    "promise/always-return": "warn"
+  },
+  "ignorePatterns": [
+    "public/",
+    "node_modules/",
+    "dist/"
+  ]
 }

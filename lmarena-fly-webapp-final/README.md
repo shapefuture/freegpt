@@ -4,12 +4,19 @@
 
 ### Lint
 
+```sh
+npm run lint      # Check all code for lint errors/warnings
+npm run lint:fix  # Auto-fix lintable errors
 ```
-npm run lint
+
+### Format
+
+```sh
+npm run format    # Format all JS files with Prettier
 ```
 
 ### Test
 
-```
-npm run test
+```sh
+npm run test      # Run all Jest tests
 ```
