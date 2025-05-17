@@ -30,8 +30,23 @@
     "promise/catch-or-return": "error",
     "promise/always-return": "warn"
   },
+  "overrides": [
+    {
+      "files": ["public/**/*.js"],
+      "env": { "browser": true, "es2021": true },
+      "globals": {
+        "window": "readonly",
+        "document": "readonly",
+        "console": "readonly",
+        "crypto": "readonly"
+      },
+      "rules": {
+        "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+        "no-console": "off"
+      }
+    }
+  ],
   "ignorePatterns": [
-    "public/",
     "node_modules/",
     "dist/"
   ]

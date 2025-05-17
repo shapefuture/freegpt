@@ -1,4 +1,9 @@
 module.exports = {
   testEnvironment: "node",
-  verbose: true
+  verbose: true,
+  testMatch: [
+    "**/src/**/*.test.js",
+    "**/public/**/*.test.js"
+  ],
+  transform: {}
 };
