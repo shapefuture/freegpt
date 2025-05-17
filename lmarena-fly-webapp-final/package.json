@@ -8,8 +8,9 @@
     "dev": "nodemon",
     "lint": "eslint src public",
     "lint:fix": "eslint src public --fix",
+    "prettier:check": "prettier --check 'src/**/*.js' 'public/**/*.js'",
     "format": "prettier --write 'src/**/*.js' 'public/**/*.js'",
-    "test": "jest"
+    "test": "jest --coverage"
   },
   "dependencies": {
     "dotenv": "^16.0.0",

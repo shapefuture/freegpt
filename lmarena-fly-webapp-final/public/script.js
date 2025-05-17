@@ -117,138 +117,147 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("New conversation initiated.");
     });
 
-    sendButton.addEventListener('click', async () => {
-        console.debug('[DEBUG] Send button clicked');
-        const userPrompt = userPromptEl.value.trim();
-        const modelA = modelAIdEl.value;
-        const modelB = modelBIdEl.value;
-        const sysPrompt = systemPromptEl.value.trim();
+    sendButton.addEventListener('click', () => {
+        (async () => {
+            try {
+                console.debug('[DEBUG] Send button clicked');
+                const userPrompt = userPromptEl.value.trim();
+                const modelA = modelAIdEl.value;
+                const modelB = modelBIdEl.value;
+                const sysPrompt = systemPromptEl.value.trim();
 
-        // Input validation
-        if (!userPrompt) {
-            statusAreaEl.textContent = 'User prompt cannot be empty.';
-            userPromptEl.focus();
-            return;
-        }
-        if (!modelA) {
-            statusAreaEl.textContent = 'Please select Model A.';
-            modelAIdEl.focus();
-            return;
-        }
-        if (!sysPrompt) {
-            statusAreaEl.textContent = 'System prompt cannot be empty.';
-            systemPromptEl.focus();
-            return;
-        }
+                // Input validation
+                if (!userPrompt) {
+                    statusAreaEl.textContent = 'User prompt cannot be empty.';
+                    userPromptEl.focus();
+                    return;
+                }
+                if (!modelA) {
+                    statusAreaEl.textContent = 'Please select Model A.';
+                    modelAIdEl.focus();
+                    return;
+                }
+                if (!sysPrompt) {
+                    statusAreaEl.textContent = 'System prompt cannot be empty.';
+                    systemPromptEl.focus();
+                    return;
+                }
 
-        sendButton.disabled = true;
-        loadingSpinner.style.display = 'inline';
-        retryActionButton.style.display = 'none';
-        modelAResponseEl.textContent = '';
-        modelBResponseEl.textContent = '';
+                sendButton.disabled = true;
+                loadingSpinner.style.display = 'inline';
+                retryActionButton.style.display = 'none';
+                modelAResponseEl.textContent = '';
+                modelBResponseEl.textContent = '';
 
-        displayMessageInHistory('user', userPrompt);
-        clientMessagesHistory.push({ role: 'user', content: userPrompt, id: generateClientUUID() });
-        userPromptEl.value = '';
+                displayMessageInHistory('user', userPrompt);
+                clientMessagesHistory.push({ role: 'user', content: userPrompt, id: generateClientUUID() });
+                userPromptEl.value = '';
 
-        const payload = {
-            userPrompt,
-            systemPrompt: sysPrompt,
-            targetModelA: modelA,
-            targetModelB: modelB,
-            clientConversationId: clientConversationId,
-            clientMessagesHistory: clientMessagesHistory.slice(0, -1)
-        };
+                const payload = {
+                    userPrompt,
+                    systemPrompt: sysPrompt,
+                    targetModelA: modelA,
+                    targetModelB: modelB,
+                    clientConversationId: clientConversationId,
+                    clientMessagesHistory: clientMessagesHistory.slice(0, -1)
+                };
 
-        statusAreaEl.textContent = 'Sending request to server...';
+                statusAreaEl.textContent = 'Sending request to server...';
 
-        if (eventSource) {
-            eventSource.close();
-        }
-        
-        try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({ message: `HTTP error ${response.status}`}));
-                console.error('[ERROR] Bad response from /api/chat:', errData);
-                throw new Error(errData.message || `Server error: ${response.status}`);
-            }
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let partialModelAResponse = "";
-            let partialModelBResponse = "";
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) {
-                    statusAreaEl.textContent = 'Stream finished.';
-                    clientMessagesHistory.push({ role: 'assistant', model: 'A', content: partialModelAResponse });
-                    clientMessagesHistory.push({ role: 'assistant', model: 'B', content: partialModelBResponse });
-                    break;
+                if (eventSource) {
+                    eventSource.close();
                 }
                 
-                const chunk = decoder.decode(value, { stream: true });
-                const messages = chunk.split('\n\n');
-                for (const message of messages) {
-                    if (message.startsWith('data: ')) {
-                        try {
-                            const data = JSON.parse(message.substring(5).trim());
-                            console.debug('[DEBUG] SSE data received:', data);
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
 
-                            if (data.type === 'STATUS') {
-                                statusAreaEl.textContent = data.message;
-                            } else if (data.type === 'MODEL_CHUNK') {
-                                if (data.modelKey === 'A') {
-                                    partialModelAResponse += data.content || "";
-                                    modelAResponseEl.textContent = partialModelAResponse;
-                                } else if (data.modelKey === 'B') {
-                                    partialModelBResponse += data.content || "";
-                                    modelBResponseEl.textContent = partialModelBResponse;
-                                }
-                                if (data.finishReason) {
-                                    statusAreaEl.textContent = `Model ${data.modelKey} finished: ${data.finishReason}.`;
-                                }
-                            } else if (data.type === 'USER_ACTION_REQUIRED') {
-                                statusAreaEl.textContent = data.message;
-                                currentRequestIdForRetry = data.requestId;
-                                retryActionButton.style.display = 'block';
-                            } else if (data.type === 'ERROR') {
-                                statusAreaEl.textContent = `Error: ${data.message}`;
-                                if(eventSource) eventSource.close();
-                                return;
-                            } else if (data.type === 'STREAM_END') {
-                                statusAreaEl.textContent = 'Models finished responding.';
-                                const finalMsgA = clientMessagesHistory.find(m => m.role === 'assistant' && m.model === 'A' && m.content === "");
-                                if (finalMsgA) finalMsgA.content = partialModelAResponse; else if(partialModelAResponse) clientMessagesHistory.push({role: 'assistant', model: 'A', content: partialModelAResponse});
-                                
-                                const finalMsgB = clientMessagesHistory.find(m => m.role === 'assistant' && m.model === 'B' && m.content === "");
-                                if (finalMsgB) finalMsgB.content = partialModelBResponse; else if(partialModelBResponse) clientMessagesHistory.push({role: 'assistant', model: 'B', content: partialModelBResponse});
-                            }
-                            if (data.conversationId && !clientConversationId) {
-                                clientConversationId = data.conversationId;
-                                console.log("Conversation ID set:", clientConversationId);
-                            }
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({ message: `HTTP error ${response.status}`}));
+                        console.error('[ERROR] Bad response from /api/chat:', errData);
+                        throw new Error(errData.message || `Server error: ${response.status}`);
+                    }
 
-                        } catch (e) {
-                            console.warn('Error parsing SSE data or non-JSON message:', message, e);
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let partialModelAResponse = "";
+                    let partialModelBResponse = "";
+
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) {
+                            statusAreaEl.textContent = 'Stream finished.';
+                            clientMessagesHistory.push({ role: 'assistant', model: 'A', content: partialModelAResponse });
+                            clientMessagesHistory.push({ role: 'assistant', model: 'B', content: partialModelBResponse });
+                            break;
+                        }
+                        
+                        const chunk = decoder.decode(value, { stream: true });
+                        const messages = chunk.split('\n\n');
+                        for (const message of messages) {
+                            if (message.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(message.substring(5).trim());
+                                    console.debug('[DEBUG] SSE data received:', data);
+
+                                    if (data.type === 'STATUS') {
+                                        statusAreaEl.textContent = data.message;
+                                    } else if (data.type === 'MODEL_CHUNK') {
+                                        if (data.modelKey === 'A') {
+                                            partialModelAResponse += data.content || "";
+                                            modelAResponseEl.textContent = partialModelAResponse;
+                                        } else if (data.modelKey === 'B') {
+                                            partialModelBResponse += data.content || "";
+                                            modelBResponseEl.textContent = partialModelBResponse;
+                                        }
+                                        if (data.finishReason) {
+                                            statusAreaEl.textContent = `Model ${data.modelKey} finished: ${data.finishReason}.`;
+                                        }
+                                    } else if (data.type === 'USER_ACTION_REQUIRED') {
+                                        statusAreaEl.textContent = data.message;
+                                        currentRequestIdForRetry = data.requestId;
+                                        retryActionButton.style.display = 'block';
+                                    } else if (data.type === 'ERROR') {
+                                        statusAreaEl.textContent = `Error: ${data.message}`;
+                                        if(eventSource) eventSource.close();
+                                        return;
+                                    } else if (data.type === 'STREAM_END') {
+                                        statusAreaEl.textContent = 'Models finished responding.';
+                                        const finalMsgA = clientMessagesHistory.find(m => m.role === 'assistant' && m.model === 'A' && m.content === "");
+                                        if (finalMsgA) finalMsgA.content = partialModelAResponse; else if(partialModelAResponse) clientMessagesHistory.push({role: 'assistant', model: 'A', content: partialModelAResponse});
+                                        
+                                        const finalMsgB = clientMessagesHistory.find(m => m.role === 'assistant' && m.model === 'B' && m.content === "");
+                                        if (finalMsgB) finalMsgB.content = partialModelBResponse; else if(partialModelBResponse) clientMessagesHistory.push({role: 'assistant', model: 'B', content: partialModelBResponse});
+                                    }
+                                    if (data.conversationId && !clientConversationId) {
+                                        clientConversationId = data.conversationId;
+                                        console.log("Conversation ID set:", clientConversationId);
+                                    }
+
+                                } catch (e) {
+                                    console.warn('Error parsing SSE data or non-JSON message:', message, e);
+                                }
+                            }
                         }
                     }
+                } catch (error) {
+                    console.error("[ERROR] Error sending/streaming chat:", error);
+                    statusAreaEl.textContent = `Error: ${error.message}`;
+                } finally {
+                    sendButton.disabled = false;
+                    loadingSpinner.style.display = 'none';
+                    console.debug('[DEBUG] Send button handler complete');
                 }
+            } catch (outerErr) {
+                // Top-level error catch for entire handler
+                statusAreaEl.textContent = `UI error: ${outerErr.message || outerErr}`;
+                sendButton.disabled = false;
+                loadingSpinner.style.display = 'none';
             }
-        } catch (error) {
-            console.error("[ERROR] Error sending/streaming chat:", error);
-            statusAreaEl.textContent = `Error: ${error.message}`;
-        } finally {
-            sendButton.disabled = false;
-            loadingSpinner.style.display = 'none';
-            console.debug('[DEBUG] Send button handler complete');
-        }
+        })();
     });
 
     retryActionButton.addEventListener('click', async () => {

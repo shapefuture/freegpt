@@ -41,6 +41,15 @@ describe('API integration tests', () => {
     ]);
   });
 
+  it('responds with 500 if /api/models throws', async () => {
+    const realFetch = require('./puppeteerManager').fetchAvailableModels;
+    require('./puppeteerManager').fetchAvailableModels = jest.fn().mockRejectedValue(new Error('fail'));
+    const res = await request(app).get('/api/models');
+    expect(res.statusCode).toBe(500);
+    expect(res.body.error).toBe('Failed to fetch models');
+    require('./puppeteerManager').fetchAvailableModels = realFetch;
+  });
+
   it('responds to POST /api/chat (mocked)', async () => {
     const res = await request(app)
       .post('/api/chat')
@@ -55,5 +64,12 @@ describe('API integration tests', () => {
     expect(res.statusCode).toBe(200);
     // SSE: just check response headers for event-stream
     expect(res.headers['content-type']).toContain('text/event-stream');
+  });
+
+  it('handles retry API logic', async () => {
+    const res = await request(app)
+      .post('/api/trigger-retry')
+      .send({ requestId: "fake-id" });
+    expect([404,200]).toContain(res.statusCode);
   });
 });
