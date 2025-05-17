@@ -327,4 +327,191 @@ async function interactWithLMArena(page, options, sseSend, waitForUserRetrySigna
     log('INFO', `Request ${requestId}: interactWithLMArena finished.`);
 }
 
-module.exports = { initialize, launchOrGetPage, closePage, closeBrowser, interactWithLMArena };
+// --- Model fetching selectors ---
+// Please update these selectors by inspecting the LMArena DOM if the UI changes.
+const MODE_SELECTOR_DROPDOWN_TRIGGER_SELECTOR = 'button[aria-haspopup="listbox"][id^="radix-"]:not([aria-label="Battle Models"])'; // Central mode dropdown (update as needed)
+const SIDE_BY_SIDE_MODE_OPTION_SELECTOR = 'div[role="option"]'; // Will filter by text "Side by Side"
+const MODEL_A_DROPDOWN_TRIGGER_SBS_SELECTOR = 'button[aria-haspopup="listbox"][id^="radix-"]:nth-of-type(1)'; // First dropdown after mode switch
+const MODEL_B_DROPDOWN_TRIGGER_SBS_SELECTOR = 'button[aria-haspopup="listbox"][id^="radix-"]:nth-of-type(2)'; // Second dropdown after mode switch
+const MODEL_LISTBOX_SELECTOR = 'div[role="listbox"]';
+const MODEL_LIST_ITEM_SELECTOR_RADIX = `${MODEL_LISTBOX_SELECTOR} div[data-radix-collection-item]`;
+const MODEL_LIST_ITEM_SELECTOR_GENERIC = `${MODEL_LISTBOX_SELECTOR} div[role="option"]`;
+
+// Fetch available models by UI scraping, with robust error/logging and fallback
+async function fetchAvailableModels(page, sseSend) {
+    log('INFO', 'Attempting to fetch available models from LMArena UI...');
+    let models = [];
+    let uniqueModelIds = new Set();
+
+    try {
+        const LMARENA_URL = process.env.LMARENA_URL || 'https://beta.lmarena.ai/';
+        const initialUrl = page.url();
+        if (!initialUrl.startsWith(LMARENA_URL) || initialUrl.includes("/c/")) {
+            log('INFO', `Navigating to ${LMARENA_URL} for model fetching.`);
+            await page.goto(LMARENA_URL, { waitUntil: 'networkidle2', timeout: 60000 });
+            sseSend({ type: 'STATUS', message: 'Navigated to LMArena main page.' });
+        } else {
+            log('DEBUG', 'Already on LMArena main page.');
+            await page.waitForTimeout(1000);
+        }
+
+        // --- Step 1: Select "Side by Side" Mode ---
+        log('INFO', 'Attempting to select "Side by Side" mode.');
+        sseSend({ type: 'STATUS', message: 'Selecting "Side by Side" mode...' });
+
+        const modeDropdownTrigger = await page.$(MODE_SELECTOR_DROPDOWN_TRIGGER_SELECTOR);
+        if (!modeDropdownTrigger) {
+            log('ERROR', 'Main mode dropdown trigger not found.');
+            await page.screenshot({ path: 'debug_mode_trigger_fail.png' });
+            sseSend({ type: 'ERROR', message: 'Could not find mode selection UI trigger.' });
+            return [];
+        }
+        await modeDropdownTrigger.click({ delay: 100 + Math.random() * 50 });
+        log('DEBUG', 'Clicked main mode dropdown trigger.');
+
+        // Wait for the mode selection dropdown to appear
+        const modeListboxSelector = 'div[role="listbox"][aria-labelledby*="radix-"]';
+        await page.waitForSelector(modeListboxSelector, { visible: true, timeout: 10000 });
+        log('DEBUG', 'Mode selection dropdown appeared.');
+
+        // Click the "Side by Side" option using text match
+        const modeOptions = await page.$(SIDE_BY_SIDE_MODE_OPTION_SELECTOR);
+        let sideBySideOption = null;
+        for (const el of modeOptions) {
+            const text = await el.evaluate(e => e.textContent.trim());
+            if (/side by side/i.test(text)) {
+                sideBySideOption = el;
+                break;
+            }
+        }
+        if (!sideBySideOption) {
+            log('ERROR', '"Side by Side" mode option not found in dropdown.');
+            await page.screenshot({ path: 'debug_sbs_option_fail.png' });
+            sseSend({ type: 'ERROR', message: 'Could not find "Side by Side" mode option.' });
+            return [];
+        }
+        await sideBySideOption.click({ delay: 100 + Math.random() * 50 });
+        log('INFO', '"Side by Side" mode selected.');
+        sseSend({ type: 'STATUS', message: '"Side by Side" mode selected.' });
+
+        // Wait for the mode switch to take effect (URL or UI state)
+        try {
+            await page.waitForFunction(
+                () => window.location.search.includes('mode=side-by-side'),
+                { timeout: 10000 }
+            );
+            log('INFO', 'URL updated to side-by-side mode.');
+        } catch (e) {
+            log('WARN', 'URL did not update to side-by-side mode, UI may have changed without URL update.');
+            await page.waitForTimeout(3000);
+        }
+
+        // --- Step 2: Extract Models from Model B selector ---
+        log('INFO', 'Attempting to extract models from "Side by Side" selectors.');
+        sseSend({ type: 'STATUS', message: 'Accessing model selection UI...' });
+
+        const modelTriggerToClick = await page.$(MODEL_B_DROPDOWN_TRIGGER_SBS_SELECTOR);
+        if (!modelTriggerToClick) {
+            log('ERROR', 'Model dropdown trigger (for Side by Side mode) not found.');
+            await page.screenshot({ path: 'debug_sbs_model_trigger_fail.png' });
+            sseSend({ type: 'ERROR', message: 'Could not find model selectors in Side by Side mode.' });
+            return [];
+        }
+
+        log('DEBUG', 'Clicking specific model dropdown trigger in Side by Side mode...');
+        await modelTriggerToClick.click({ delay: 100 + Math.random() * 50 });
+
+        await page.waitForSelector(MODEL_LISTBOX_SELECTOR, { visible: true, timeout: 10000 });
+        log('INFO', 'Model dropdown listbox (Side by Side) appeared.');
+
+        let modelElements = await page.$(MODEL_LIST_ITEM_SELECTOR_RADIX);
+        if (!modelElements || modelElements.length === 0) {
+            modelElements = await page.$(MODEL_LIST_ITEM_SELECTOR_GENERIC);
+        }
+
+        if (modelElements && modelElements.length > 0) {
+            log('INFO', `Found ${modelElements.length} model list items.`);
+            for (const element of modelElements) {
+                try {
+                    let modelId = await element.evaluate(el => el.textContent?.trim());
+                    const dataValue = await element.evaluate(el => el.getAttribute('data-value'));
+                    if (dataValue) modelId = dataValue.trim();
+                    if (modelId && !uniqueModelIds.has(modelId)) {
+                        models.push({ id: modelId, name: modelId });
+                        uniqueModelIds.add(modelId);
+                    }
+                } catch (evalError) {
+                    log('WARN', 'Error evaluating a model list item:', evalError.message);
+                }
+            }
+        } else {
+            log('ERROR', 'Could not extract model list items from dropdown in Side by Side mode.');
+            await page.screenshot({ path: 'debug_sbs_model_items_fail.png' });
+        }
+
+        // Close the dropdown
+        try {
+            await page.keyboard.press('Escape');
+            log('DEBUG', 'Pressed Escape to close model dropdown.');
+        } catch (e) { log('WARN', 'Failed to press Escape for model dropdown.');}
+
+        // --- Step 3: API Fallback ---
+        if (models.length === 0) {
+            log('INFO', 'UI model scraping yielded no results. Attempting API fallback...');
+            try {
+                const apiModels = await page.evaluate(async () => {
+                    try {
+                        const resp = await fetch('/api/v1/models');
+                        return await resp.json();
+                    } catch (e) { return null; }
+                });
+                if (apiModels && apiModels.data) {
+                    apiModels.data.forEach(model => {
+                        if (model.id && !uniqueModelIds.has(model.id)) {
+                            models.push({ id: model.id, name: `${model.id} (API)` });
+                            uniqueModelIds.add(model.id);
+                        }
+                    });
+                    log('INFO', `Fetched ${apiModels.data.length} models via API fallback.`);
+                }
+            } catch (apiErr) { log('WARN', 'API fallback for models failed.', apiErr); }
+        }
+
+        // --- Step 4: Default Fallback ---
+        if (models.length === 0) {
+            log('WARN', 'No models found. Adding known defaults.');
+            const defaultModels = [
+                { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus (Default)' },
+                { id: 'gpt-4o-latest-20250326', name: 'GPT-4o Latest (Default)' },
+                { id: 'gemini-2.0-flash-001', name: 'Gemini 2.0 Flash (Default)'}
+            ];
+            defaultModels.forEach(m => {
+                if (!uniqueModelIds.has(m.id)) {
+                    models.push(m);
+                    uniqueModelIds.add(m.id);
+                }
+            });
+        }
+
+        const finalModels = Array.from(uniqueModelIds).map(id => models.find(m => m.id === id)).filter(Boolean);
+
+        log('INFO', `Successfully fetched ${finalModels.length} unique models in total.`);
+        sseSend({ type: 'STATUS', message: `Found ${finalModels.length} models.` });
+        return finalModels;
+
+    } catch (error) {
+        log('ERROR', 'Error in fetchAvailableModels:', error?.stack || error);
+        try { await page.screenshot({ path: 'debug_fetch_models_main_error.png' }); } catch (e) {}
+        sseSend({ type: 'ERROR', message: 'Failed to fetch model list.' });
+        return [];
+    }
+}
+
+module.exports = { 
+    initialize,
+    launchOrGetPage,
+    closePage,
+    closeBrowser,
+    interactWithLMArena,
+    fetchAvailableModels
+};
