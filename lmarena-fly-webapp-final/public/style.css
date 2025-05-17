@@ -1,4 +1,4 @@
-/* Apple-inspired Minimalist Monochrome CSS Award Winning Theme */
+/* Apple-inspired Minimalist Monochrome CSS Award Winning Theme + Animations & Typography */
 
 :root {
   --background: #f9f9fa;
@@ -20,6 +20,24 @@
   --input-border: #e0e0e0;
   --input-focus: #222;
   --font: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --heading-font: "San Francisco Display", var(--font);
+  --transition: 0.19s cubic-bezier(.45,.05,.55,.95);
+  --fade-in: fadeIn 0.7s cubic-bezier(.45,.05,.55,.95);
+  --slide-up: slideUp 0.6s cubic-bezier(.45,.05,.55,.95);
+}
+
+@keyframes fadeIn {
+  from { opacity:0; }
+  to { opacity:1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(32px);}
+  to { opacity: 1; transform: none;}
+}
+@keyframes pop {
+  0% { transform: scale(.97);}
+  60% { transform: scale(1.03);}
+  100% { transform: scale(1);}
 }
 
 html, body {
@@ -30,6 +48,8 @@ html, body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -52,16 +72,20 @@ body {
   flex-direction: column;
   gap: 32px;
   border: 1.5px solid var(--border);
+  animation: var(--slide-up);
 }
 
 h1 {
-  font-weight: 600;
-  font-size: 2.2rem;
+  font-family: var(--heading-font);
+  font-weight: 700;
+  font-size: 2.5rem;
   letter-spacing: -0.04em;
   color: var(--primary);
   margin: 0 0 10px 0;
   text-align: center;
-  line-height: 1.1;
+  line-height: 1.11;
+  animation: var(--fade-in);
+  text-shadow: 0 1px 0 #fff, 0 2px 8px rgba(0,0,0,.03);
 }
 
 .settings {
@@ -69,32 +93,40 @@ h1 {
   flex-direction: column;
   gap: 20px;
   margin-bottom: 12px;
+  animation: var(--fade-in);
 }
 
 label {
-  font-size: 1rem;
+  font-size: 1.06rem;
   color: var(--secondary);
-  font-weight: 500;
+  font-weight: 600;
   margin-bottom: 6px;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  font-family: var(--heading-font);
 }
 
 input[type="text"], textarea {
   width: 100%;
-  font-size: 1rem;
+  font-size: 1.07rem;
   background: var(--input-bg);
   border: 1.25px solid var(--input-border);
   border-radius: var(--radius);
-  padding: 11px 17px;
+  padding: 13px 18px;
   color: var(--primary);
-  transition: border-color .2s;
+  transition: border-color var(--transition), box-shadow var(--transition);
   outline: none;
   font-family: inherit;
   margin-bottom: 0;
   box-sizing: border-box;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  appearance: none;
 }
 
 input[type="text"]:focus, textarea:focus {
   border-color: var(--input-focus);
+  box-shadow: 0 0 0 2.5px #1111;
 }
 
 textarea#userPrompt {
@@ -104,20 +136,24 @@ textarea#userPrompt {
 }
 
 button {
-  font-family: inherit;
-  font-size: 1rem;
-  font-weight: 500;
+  font-family: var(--heading-font);
+  font-size: 1.08rem;
+  font-weight: 600;
   background: var(--button-bg);
   color: var(--button-text);
   border: 1.35px solid var(--button-outline);
   border-radius: var(--radius);
-  padding: 12px 22px;
+  padding: 13px 24px;
   margin: 0 8px 0 0;
-  transition: background .15s, color .15s, border-color .2s, box-shadow .15s;
+  transition: background var(--transition), color var(--transition), border-color var(--transition), box-shadow var(--transition), transform .09s cubic-bezier(.49,.09,.51,.99);
   cursor: pointer;
   outline: none;
-  box-shadow: none;
+  box-shadow: 0 1.5px 6px rgba(0,0,0,0.04);
   letter-spacing: 0.01em;
+  position: relative;
+  overflow: hidden;
+  animation: var(--fade-in);
+  will-change: transform;
 }
 
 button:last-child {
@@ -129,6 +165,12 @@ button:focus-visible {
   background: var(--button-hover-bg);
   color: var(--button-hover-text);
   border-color: var(--input-focus);
+  transform: scale(1.04);
+  z-index: 1;
+}
+
+button:active {
+  animation: pop 0.16s;
 }
 
 #retryActionButton {
@@ -136,7 +178,6 @@ button:focus-visible {
   background: var(--subtle);
   border: 1.25px solid var(--border-dark);
 }
-
 #retryActionButton:hover,
 #retryActionButton:focus-visible {
   background: var(--primary);
@@ -150,23 +191,28 @@ button:focus-visible {
   background: var(--subtle);
   border-radius: var(--radius);
   min-height: 24px;
-  font-size: 1.03rem;
+  font-size: 1.09rem;
   color: var(--secondary);
-  transition: background .1s;
+  transition: background .13s;
   border: 1.2px solid var(--border);
-  font-weight: 400;
+  font-weight: 500;
+  font-family: var(--heading-font);
+  letter-spacing: .01em;
+  animation: var(--fade-in);
 }
 
 .chat-area {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  animation: var(--fade-in);
 }
 
 .responses {
   display: flex;
   gap: 20px;
   margin-top: 16px;
+  animation: var(--fade-in);
 }
 
 .response-column {
@@ -177,12 +223,14 @@ button:focus-visible {
 }
 
 .response-column h2 {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.06rem;
+  font-weight: 700;
   color: var(--secondary);
   margin: 0 0 8px 0;
   padding: 0;
   letter-spacing: -0.01em;
+  font-family: var(--heading-font);
+  text-shadow: 0 1px 0 #fff;
 }
 
 .response-box {
@@ -195,10 +243,12 @@ button:focus-visible {
   overflow-y: auto;
   max-height: 220px;
   border-radius: var(--radius);
-  font-size: 1.08rem;
+  font-size: 1.13rem;
   font-family: var(--font);
-  line-height: 1.6;
-  box-shadow: 0 1.5px 4px rgba(0,0,0,0.03);
+  line-height: 1.68;
+  box-shadow: 0 1.5px 12px rgba(0,0,0,0.04);
+  animation: var(--slide-up);
+  opacity: 1;
 }
 
 .message-history {
@@ -211,38 +261,53 @@ button:focus-visible {
   max-height: 120px;
   margin-bottom: 8px;
   border-radius: var(--radius);
-  font-size: 1.02rem;
+  font-size: 1.06rem;
   font-family: var(--font);
   line-height: 1.65;
+  animation: var(--fade-in);
 }
 
 .user-message {
   text-align: right;
   margin-bottom: 6px;
+  animation: fadeIn 0.4s;
 }
 .user-message span {
   background: transparent;
   color: var(--primary);
-  padding: 6px 14px;
+  padding: 7px 16px;
   border-radius: 18px 18px 0 18px;
   display: inline-block;
   border: 1.05px solid var(--border-dark);
-  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  font-weight: 600;
+  font-family: var(--font);
+  letter-spacing: .01em;
+  animation: slideUp 0.45s;
 }
 
 .assistant-message {
   text-align: left;
   margin-bottom: 6px;
+  animation: fadeIn 0.4s;
 }
 .assistant-message span {
   background: transparent;
   color: var(--secondary);
-  padding: 6px 14px;
+  padding: 7px 16px;
   border-radius: 18px 18px 18px 0;
   display: inline-block;
   border: 1.05px solid var(--border);
   font-weight: 400;
+  font-family: var(--font);
+  letter-spacing: .01em;
+  animation: slideUp 0.45s;
 }
+
+::-webkit-input-placeholder { color: #bdbdbd; opacity: 1;}
+::-moz-placeholder { color: #bdbdbd; opacity: 1;}
+:-ms-input-placeholder { color: #bdbdbd; opacity: 1;}
+::placeholder { color: #bdbdbd; opacity: 1; }
 
 @media (max-width: 700px) {
   .container {
