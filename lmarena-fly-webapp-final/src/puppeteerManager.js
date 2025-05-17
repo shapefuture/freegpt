@@ -345,11 +345,27 @@ async function fetchAvailableModels(page, sseSend) {
 
     try {
         const LMARENA_URL = process.env.LMARENA_URL || 'https://beta.lmarena.ai/';
-        const initialUrl = page.url();
+        let initialUrl;
+        try {
+            initialUrl = page.url();
+        } catch (e) {
+            log('ERROR', 'Could not get current page URL.', e);
+            sseSend({ type: 'ERROR', message: 'Internal error (page url).' });
+            return [];
+        }
+
+        // --- Navigation ---
         if (!initialUrl.startsWith(LMARENA_URL) || initialUrl.includes("/c/")) {
             log('INFO', `Navigating to ${LMARENA_URL} for model fetching.`);
-            await page.goto(LMARENA_URL, { waitUntil: 'networkidle2', timeout: 60000 });
-            sseSend({ type: 'STATUS', message: 'Navigated to LMArena main page.' });
+            try {
+                await page.goto(LMARENA_URL, { waitUntil: 'networkidle2', timeout: 60000 });
+                sseSend({ type: 'STATUS', message: 'Navigated to LMArena main page.' });
+            } catch (e) {
+                log('ERROR', 'Failed to navigate to LMArena.', e.message);
+                try { await page.screenshot({ path: 'debug_lmarena_nav_fail.png' }); } catch {}
+                sseSend({ type: 'ERROR', message: 'Could not navigate to LMArena.' });
+                return [];
+            }
         } else {
             log('DEBUG', 'Already on LMArena main page.');
             await page.waitForTimeout(1000);
@@ -359,40 +375,70 @@ async function fetchAvailableModels(page, sseSend) {
         log('INFO', 'Attempting to select "Side by Side" mode.');
         sseSend({ type: 'STATUS', message: 'Selecting "Side by Side" mode...' });
 
-        const modeDropdownTrigger = await page.$(MODE_SELECTOR_DROPDOWN_TRIGGER_SELECTOR);
+        let modeDropdownTrigger;
+        try {
+            modeDropdownTrigger = await page.$(MODE_SELECTOR_DROPDOWN_TRIGGER_SELECTOR);
+        } catch (e) {
+            log('ERROR', 'Error finding mode dropdown trigger.', e.message);
+        }
         if (!modeDropdownTrigger) {
             log('ERROR', 'Main mode dropdown trigger not found.');
-            await page.screenshot({ path: 'debug_mode_trigger_fail.png' });
+            try { await page.screenshot({ path: 'debug_mode_trigger_fail.png' }); } catch {}
             sseSend({ type: 'ERROR', message: 'Could not find mode selection UI trigger.' });
             return [];
         }
-        await modeDropdownTrigger.click({ delay: 100 + Math.random() * 50 });
-        log('DEBUG', 'Clicked main mode dropdown trigger.');
+        try {
+            await modeDropdownTrigger.click({ delay: 100 + Math.random() * 50 });
+            log('DEBUG', 'Clicked main mode dropdown trigger.');
+        } catch (e) {
+            log('ERROR', 'Failed to click mode dropdown trigger.', e.message);
+            try { await page.screenshot({ path: 'debug_mode_dropdown_click_fail.png' }); } catch {}
+            sseSend({ type: 'ERROR', message: 'Could not open mode dropdown.' });
+            return [];
+        }
 
         // Wait for the mode selection dropdown to appear
         const modeListboxSelector = 'div[role="listbox"][aria-labelledby*="radix-"]';
-        await page.waitForSelector(modeListboxSelector, { visible: true, timeout: 10000 });
+        try {
+            await page.waitForSelector(modeListboxSelector, { visible: true, timeout: 10000 });
+        } catch (e) {
+            log('ERROR', 'Mode selection dropdown did not appear.', e.message);
+            try { await page.screenshot({ path: 'debug_mode_dropdown_not_visible.png' }); } catch {}
+            sseSend({ type: 'ERROR', message: 'Mode selection dropdown did not appear.' });
+            return [];
+        }
         log('DEBUG', 'Mode selection dropdown appeared.');
 
         // Click the "Side by Side" option using text match
-        const modeOptions = await page.$(SIDE_BY_SIDE_MODE_OPTION_SELECTOR);
         let sideBySideOption = null;
-        for (const el of modeOptions) {
-            const text = await el.evaluate(e => e.textContent.trim());
-            if (/side by side/i.test(text)) {
-                sideBySideOption = el;
-                break;
+        try {
+            const modeOptions = await page.$(SIDE_BY_SIDE_MODE_OPTION_SELECTOR);
+            for (const el of modeOptions) {
+                const text = await el.evaluate(e => e.textContent.trim());
+                if (/side by side/i.test(text)) {
+                    sideBySideOption = el;
+                    break;
+                }
             }
+        } catch (e) {
+            log('ERROR', 'Error searching for Side by Side mode option.', e.message);
         }
         if (!sideBySideOption) {
             log('ERROR', '"Side by Side" mode option not found in dropdown.');
-            await page.screenshot({ path: 'debug_sbs_option_fail.png' });
+            try { await page.screenshot({ path: 'debug_sbs_option_fail.png' }); } catch {}
             sseSend({ type: 'ERROR', message: 'Could not find "Side by Side" mode option.' });
             return [];
         }
-        await sideBySideOption.click({ delay: 100 + Math.random() * 50 });
-        log('INFO', '"Side by Side" mode selected.');
-        sseSend({ type: 'STATUS', message: '"Side by Side" mode selected.' });
+        try {
+            await sideBySideOption.click({ delay: 100 + Math.random() * 50 });
+            log('INFO', '"Side by Side" mode selected.');
+            sseSend({ type: 'STATUS', message: '"Side by Side" mode selected.' });
+        } catch (e) {
+            log('ERROR', 'Failed to click "Side by Side" option.', e.message);
+            try { await page.screenshot({ path: 'debug_sbs_option_click_fail.png' }); } catch {}
+            sseSend({ type: 'ERROR', message: 'Could not select "Side by Side" mode.' });
+            return [];
+        }
 
         // Wait for the mode switch to take effect (URL or UI state)
         try {
@@ -410,23 +456,46 @@ async function fetchAvailableModels(page, sseSend) {
         log('INFO', 'Attempting to extract models from "Side by Side" selectors.');
         sseSend({ type: 'STATUS', message: 'Accessing model selection UI...' });
 
-        const modelTriggerToClick = await page.$(MODEL_B_DROPDOWN_TRIGGER_SBS_SELECTOR);
+        let modelTriggerToClick;
+        try {
+            modelTriggerToClick = await page.$(MODEL_B_DROPDOWN_TRIGGER_SBS_SELECTOR);
+        } catch (e) {
+            log('ERROR', 'Error finding model dropdown trigger.', e.message);
+        }
         if (!modelTriggerToClick) {
             log('ERROR', 'Model dropdown trigger (for Side by Side mode) not found.');
-            await page.screenshot({ path: 'debug_sbs_model_trigger_fail.png' });
+            try { await page.screenshot({ path: 'debug_sbs_model_trigger_fail.png' }); } catch {}
             sseSend({ type: 'ERROR', message: 'Could not find model selectors in Side by Side mode.' });
             return [];
         }
+        try {
+            await modelTriggerToClick.click({ delay: 100 + Math.random() * 50 });
+            log('DEBUG', 'Clicked model dropdown trigger in Side by Side mode.');
+        } catch (e) {
+            log('ERROR', 'Failed to click model dropdown trigger.', e.message);
+            try { await page.screenshot({ path: 'debug_model_dropdown_click_fail.png' }); } catch {}
+            sseSend({ type: 'ERROR', message: 'Could not open model dropdown.' });
+            return [];
+        }
 
-        log('DEBUG', 'Clicking specific model dropdown trigger in Side by Side mode...');
-        await modelTriggerToClick.click({ delay: 100 + Math.random() * 50 });
-
-        await page.waitForSelector(MODEL_LISTBOX_SELECTOR, { visible: true, timeout: 10000 });
+        try {
+            await page.waitForSelector(MODEL_LISTBOX_SELECTOR, { visible: true, timeout: 10000 });
+        } catch (e) {
+            log('ERROR', 'Model dropdown listbox did not appear.', e.message);
+            try { await page.screenshot({ path: 'debug_model_dropdown_not_visible.png' }); } catch {}
+            sseSend({ type: 'ERROR', message: 'Model dropdown did not appear.' });
+            return [];
+        }
         log('INFO', 'Model dropdown listbox (Side by Side) appeared.');
 
-        let modelElements = await page.$(MODEL_LIST_ITEM_SELECTOR_RADIX);
-        if (!modelElements || modelElements.length === 0) {
-            modelElements = await page.$(MODEL_LIST_ITEM_SELECTOR_GENERIC);
+        let modelElements = [];
+        try {
+            modelElements = await page.$(MODEL_LIST_ITEM_SELECTOR_RADIX);
+            if (!modelElements || modelElements.length === 0) {
+                modelElements = await page.$(MODEL_LIST_ITEM_SELECTOR_GENERIC);
+            }
+        } catch (e) {
+            log('ERROR', 'Error querying model list items.', e.message);
         }
 
         if (modelElements && modelElements.length > 0) {
@@ -446,14 +515,14 @@ async function fetchAvailableModels(page, sseSend) {
             }
         } else {
             log('ERROR', 'Could not extract model list items from dropdown in Side by Side mode.');
-            await page.screenshot({ path: 'debug_sbs_model_items_fail.png' });
+            try { await page.screenshot({ path: 'debug_sbs_model_items_fail.png' }); } catch {}
         }
 
         // Close the dropdown
         try {
             await page.keyboard.press('Escape');
             log('DEBUG', 'Pressed Escape to close model dropdown.');
-        } catch (e) { log('WARN', 'Failed to press Escape for model dropdown.');}
+        } catch (e) { log('WARN', 'Failed to press Escape for model dropdown.', e.message); }
 
         // --- Step 3: API Fallback ---
         if (models.length === 0) {
