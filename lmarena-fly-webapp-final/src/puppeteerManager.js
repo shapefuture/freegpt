@@ -338,6 +338,12 @@ const MODEL_LIST_ITEM_SELECTOR_RADIX = `${MODEL_LISTBOX_SELECTOR} div[data-radix
 const MODEL_LIST_ITEM_SELECTOR_GENERIC = `${MODEL_LISTBOX_SELECTOR} div[role="option"]`;
 
 // Fetch available models by UI scraping, with robust error/logging and fallback
+/**
+ * Fetches the available models from the LMArena UI, falling back to API or known defaults if needed.
+ * @param {import('puppeteer').Page} page - Puppeteer page instance.
+ * @param {(data:object)=>void} sseSend - SSE/status feedback callback.
+ * @returns {Promise<Array<{id:string,name:string}>>}
+ */
 async function fetchAvailableModels(page, sseSend) {
     log('INFO', 'Attempting to fetch available models from LMArena UI...');
     let models = [];

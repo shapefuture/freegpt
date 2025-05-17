@@ -311,12 +311,21 @@ button:active {
 
 @media (max-width: 700px) {
   .container {
-    padding: 18px 4vw 18px 4vw;
+    padding: 12px 2vw 12px 2vw;
     max-width: 99vw;
     min-width: unset;
   }
   .responses {
     flex-direction: column;
     gap: 12px;
+  }
+  button, select, textarea, input[type="text"] {
+    font-size: 1.12rem;
+    min-height: 46px;
+    padding: 12px 8px;
+    touch-action: manipulation;
+  }
+  .status-area, .response-box, .message-history {
+    font-size: 1.09rem;
   }
 }

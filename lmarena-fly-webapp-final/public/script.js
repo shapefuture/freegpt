@@ -13,6 +13,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const modelBResponseEl = document.getElementById('modelBResponse');
     const messageHistoryEl = document.getElementById('messageHistory');
 
+    // Accessibility: focus management, ARIA feedback, keyboard navigation
+    function announceStatus(msg) {
+        statusAreaEl.textContent = msg;
+        statusAreaEl.setAttribute('aria-live', 'polite');
+        setTimeout(() => statusAreaEl.setAttribute('aria-live', 'off'), 1500);
+    }
+
     // Dynamic Model Selectors
     async function fetchModelsAndPopulate() {
         loadingSpinner.style.display = "inline";
@@ -31,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     selectEl.appendChild(opt);
                 });
             });
+            announceStatus("Models loaded.");
         } catch (e) {
             [modelAIdEl, modelBIdEl].forEach(selectEl => {
                 selectEl.innerHTML = '';
@@ -39,13 +47,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 opt.textContent = 'Unavailable';
                 selectEl.appendChild(opt);
             });
-            statusAreaEl.textContent = "⚠️ Could not load models. Please try again later.";
+            announceStatus("⚠️ Could not load models. Please try again later.");
         } finally {
             loadingSpinner.style.display = "none";
         }
     }
 
     fetchModelsAndPopulate();
+
+    // Keyboard accessibility for model selects
+    [modelAIdEl, modelBIdEl].forEach(selectEl => {
+        selectEl.addEventListener("keydown", e => {
+            if (e.key === "Enter" && selectEl.value) {
+                userPromptEl.focus();
+            }
+        });
+    });
+
+    // Analytics stub
+    function sendAnalytics(event, details) {
+        // You may replace this with a call to analytics endpoint
+        console.log("[Analytics]", event, details);
+    }
+
+    // Focus management for errors
+    function focusFirstError() {
+        if (!systemPromptEl.value.trim()) return systemPromptEl.focus();
+        if (!modelAIdEl.value) return modelAIdEl.focus();
+        if (!userPromptEl.value.trim()) return userPromptEl.focus();
+    }
 
     let clientConversationId = null;
     let clientMessagesHistory = [];
