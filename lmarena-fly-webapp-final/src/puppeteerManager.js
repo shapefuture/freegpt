@@ -11,6 +11,10 @@ const LMARENA_URL = process.env.LMARENA_URL || 'https://beta.lmarena.ai/';
 const PROMPT_TEXTAREA_SELECTOR = 'textarea[placeholder*="Ask anything"], textarea[placeholder*="Send a message"]';
 const SEND_BUTTON_SELECTOR = 'form button[type="submit"]';
 
+/**
+ * Initializes the Puppeteer browser instance if not already running.
+ * @returns {Promise<void>}
+ */
 async function initialize() {
     verboseEntry('puppeteerManager.initialize', {});
     try {
@@ -24,6 +28,10 @@ async function initialize() {
     }
 }
 
+/**
+ * Launches or returns an existing Puppeteer page instance.
+ * @returns {Promise<import('puppeteer').Page>}
+ */
 async function launchOrGetPage() {
     verboseEntry('puppeteerManager.launchOrGetPage', {});
     try {

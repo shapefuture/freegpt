@@ -172,10 +172,15 @@ app.use((err, req, res, next) => {
   }
 });
 
-app.listen(PORT, () => {
+if (require.main === module) {
+  app.listen(PORT, () => {
     log('INFO', `Server listening on port ${PORT}`);
     puppeteerManager.initialize();
-});
+  });
+}
+
+// Export app for tests
+module.exports = app;
 
 process.on('SIGINT', async () => { 
     log('INFO', 'SIGINT received, shutting down...');
