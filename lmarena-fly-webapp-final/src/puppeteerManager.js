@@ -1,6 +1,6 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const { log, generateUUID } = require('./utils');
+const { log, generateUUID, verboseEntry, verboseExit } = require('./utils');
 
 puppeteer.use(StealthPlugin());
 
@@ -12,100 +12,129 @@ const PROMPT_TEXTAREA_SELECTOR = 'textarea[placeholder*="Ask anything"], textare
 const SEND_BUTTON_SELECTOR = 'form button[type="submit"]';
 
 async function initialize() {
-    if (!browserInstance) {
-        await launchOrGetPage();
+    verboseEntry('puppeteerManager.initialize', {});
+    try {
+        if (!browserInstance) {
+            await launchOrGetPage();
+        }
+        verboseExit('puppeteerManager.initialize', 'Browser ready');
+    } catch (e) {
+        log('ERROR', 'Error in initialize:', e.stack || e);
+        throw e;
     }
 }
 
 async function launchOrGetPage() {
-    if (browserInstance && browserInstance.isConnected()) {
-        if (currentPageInstance && !currentPageInstance.isClosed()) {
-            try {
-                await currentPageInstance.goto('about:blank', {waitUntil: 'networkidle2'});
-                log('DEBUG', 'Reusing existing page, navigated to about:blank.');
-            } catch (e) {
-                log('WARN', 'Failed to navigate existing page to about:blank, creating new.', e.message);
-                try { await currentPageInstance.close(); } catch (closeErr) { /* ignore */ }
+    verboseEntry('puppeteerManager.launchOrGetPage', {});
+    try {
+        if (browserInstance && browserInstance.isConnected()) {
+            if (currentPageInstance && !currentPageInstance.isClosed()) {
+                try {
+                    await currentPageInstance.goto('about:blank', {waitUntil: 'networkidle2'});
+                    log('DEBUG', 'Reusing existing page, navigated to about:blank.');
+                } catch (e) {
+                    log('WARN', 'Failed to navigate existing page to about:blank, creating new.', e.message);
+                    try { await currentPageInstance.close(); } catch (closeErr) { log('WARN', 'Error closing page', closeErr); }
+                    currentPageInstance = await browserInstance.newPage();
+                }
+            } else {
                 currentPageInstance = await browserInstance.newPage();
+                log('DEBUG', 'Created new page in existing browser.');
             }
         } else {
-            currentPageInstance = await browserInstance.newPage();
-            log('DEBUG', 'Created new page in existing browser.');
-        }
-    } else {
-        log('INFO', 'Launching new browser instance...');
-        const headlessMode = process.env.PUPPETEER_HEADLESS === 'true' ? 'new' : false;
-        const launchOptions = {
-            headless: headlessMode,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu'
-            ]
-        };
-        if (process.env.PROXY_SERVER_URL) {
-            launchOptions.args.push(`--proxy-server=${process.env.PROXY_SERVER_URL}`);
-        }
-        browserInstance = await puppeteer.launch(launchOptions);
-        log('INFO', 'Browser instance launched.');
-        browserInstance.on('disconnected', () => {
-            log('WARN', 'Browser disconnected!');
-            browserInstance = null;
-            currentPageInstance = null;
-        });
-        currentPageInstance = await browserInstance.newPage();
-        log('DEBUG', 'Created new page in new browser.');
-    }
-
-    await currentPageInstance.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36');
-    await currentPageInstance.setViewport({ width: 1366, height: 768 });
-
-    await currentPageInstance.evaluateOnNewDocument(() => {
-        window.capturedTurnstileParams = {};
-        const originalTurnstileRender = window.turnstile?.render;
-        if (originalTurnstileRender) {
-            window.turnstile = new Proxy(window.turnstile, {
-                get(target, prop) {
-                    if (prop === 'render') {
-                        return function(element, options) {
-                            window.capturedTurnstileParams = { sitekey: options.sitekey, action: options.action, cData: options.cData, chlPageData: options.chlPageData, callbackName: options.callback?.name };
-                            return originalTurnstileRender.apply(target, [element, options]);
-                        };
-                    }
-                    return target[prop];
-                }
+            log('INFO', 'Launching new browser instance...');
+            const headlessMode = process.env.PUPPETEER_HEADLESS === 'true' ? 'new' : false;
+            const launchOptions = {
+                headless: headlessMode,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-gpu'
+                ]
+            };
+            if (process.env.PROXY_SERVER_URL) {
+                launchOptions.args.push(`--proxy-server=${process.env.PROXY_SERVER_URL}`);
+            }
+            browserInstance = await puppeteer.launch(launchOptions);
+            log('INFO', 'Browser instance launched.');
+            browserInstance.on('disconnected', () => {
+                log('WARN', 'Browser disconnected!');
+                browserInstance = null;
+                currentPageInstance = null;
             });
+            currentPageInstance = await browserInstance.newPage();
+            log('DEBUG', 'Created new page in new browser.');
         }
-    });
-    return currentPageInstance;
+
+        await currentPageInstance.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36');
+        await currentPageInstance.setViewport({ width: 1366, height: 768 });
+
+        await currentPageInstance.evaluateOnNewDocument(() => {
+            window.capturedTurnstileParams = {};
+            const originalTurnstileRender = window.turnstile?.render;
+            if (originalTurnstileRender) {
+                window.turnstile = new Proxy(window.turnstile, {
+                    get(target, prop) {
+                        if (prop === 'render') {
+                            return function(element, options) {
+                                window.capturedTurnstileParams = { sitekey: options.sitekey, action: options.action, cData: options.cData, chlPageData: options.chlPageData, callbackName: options.callback?.name };
+                                return originalTurnstileRender.apply(target, [element, options]);
+                            };
+                        }
+                        return target[prop];
+                    }
+                });
+            }
+        });
+        verboseExit('puppeteerManager.launchOrGetPage', 'Page ready');
+        return currentPageInstance;
+    } catch (err) {
+        log('ERROR', 'Error in launchOrGetPage:', err.stack || err);
+        throw err;
+    }
 }
 
 async function closePage() {
-    if (currentPageInstance && !currentPageInstance.isClosed()) {
-        try {
-            await currentPageInstance.close();
-            log('INFO', 'Current page closed.');
-        } catch(e){ log('WARN', 'Error closing page', e.message); }
+    verboseEntry('puppeteerManager.closePage', {});
+    try {
+        if (currentPageInstance && !currentPageInstance.isClosed()) {
+            try {
+                await currentPageInstance.close();
+                log('INFO', 'Current page closed.');
+            } catch(e){ log('WARN', 'Error closing page', e.message); }
+        }
+        currentPageInstance = null;
+        verboseExit('puppeteerManager.closePage', 'Success');
+    } catch (e) {
+        log('ERROR', 'Error in closePage:', e.stack || e);
+        throw e;
     }
-    currentPageInstance = null;
 }
 
 async function closeBrowser() {
-    if (browserInstance) {
-        try {
-            await browserInstance.close();
-            log('INFO', 'Browser instance closed.');
-        } catch(e){ log('WARN', 'Error closing browser', e.message); }
+    verboseEntry('puppeteerManager.closeBrowser', {});
+    try {
+        if (browserInstance) {
+            try {
+                await browserInstance.close();
+                log('INFO', 'Browser instance closed.');
+            } catch(e){ log('WARN', 'Error closing browser', e.message); }
+        }
+        browserInstance = null;
+        currentPageInstance = null;
+        verboseExit('puppeteerManager.closeBrowser', 'Success');
+    } catch (e) {
+        log('ERROR', 'Error in closeBrowser:', e.stack || e);
+        throw e;
     }
-    browserInstance = null;
-    currentPageInstance = null;
 }
 
 async function interactWithLMArena(page, options, sseSend, waitForUserRetrySignal) {
+    verboseEntry('puppeteerManager.interactWithLMArena', { options });
     const { userPrompt, systemPrompt, targetModelA, targetModelB, clientConversationId, clientMessagesHistory, requestId } = options;
     let attempt = 0;
     const MAX_ATTEMPTS_AFTER_USER_RETRY = 2;
@@ -294,6 +323,7 @@ async function interactWithLMArena(page, options, sseSend, waitForUserRetrySigna
         }
     }
 
+    verboseExit('puppeteerManager.interactWithLMArena', 'Interaction complete');
     log('INFO', `Request ${requestId}: interactWithLMArena finished.`);
 }
 

@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const { log, generateUUID } = require('./utils');
+const { log, generateUUID, verboseEntry, verboseExit } = require('./utils');
 const puppeteerManager = require('./puppeteerManager');
 
 const app = express();
@@ -13,10 +13,18 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 const waitingForRetryResolvers = new Map(); 
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+    verboseEntry('GET /', { url: req.url, headers: req.headers });
+    try {
+        res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+        verboseExit('GET /', "Sent index.html");
+    } catch (err) {
+        log('ERROR', 'Failed to send index.html', err);
+        res.status(500).send('Server error');
+    }
 });
 
 app.post('/api/chat', async (req, res) => {
+    verboseEntry('POST /api/chat', req.body);
     const { 
         userPrompt, systemPrompt, targetModelA, targetModelB, 
         clientConversationId: existingClientConversationId, 
@@ -34,6 +42,7 @@ app.post('/api/chat', async (req, res) => {
     });
 
     const sseSend = (data) => {
+        log('DEBUG', 'SSE Send:', data);
         if (!res.writableEnded) {
             res.write(`data: ${JSON.stringify(data)}\n\n`);
         }
@@ -46,6 +55,7 @@ app.post('/api/chat', async (req, res) => {
         }
         
         const waitForUserRetrySignal = () => {
+            log('DEBUG', `[${requestId}] Waiting for user retry signal`);
             return new Promise((resolve) => {
                 waitingForRetryResolvers.set(requestId, resolve);
                 log('DEBUG', `Request ${requestId}: Paused, waiting for user retry signal.`);
@@ -63,9 +73,9 @@ app.post('/api/chat', async (req, res) => {
             sseSend,
             waitForUserRetrySignal
         );
-
+        verboseExit('POST /api/chat', "Chat interaction finished.");
     } catch (error) {
-        log('ERROR', `Request ${requestId}: Error in /api/chat handler:`, error.message);
+        log('ERROR', `Request ${requestId}: Error in /api/chat handler:`, error.stack || error.message || error);
         sseSend({ type: 'ERROR', message: `Server error: ${error.message}` });
     } finally {
         if (!res.writableEnded) {
@@ -79,6 +89,7 @@ app.post('/api/chat', async (req, res) => {
 });
 
 app.post('/api/trigger-retry', (req, res) => {
+    verboseEntry('POST /api/trigger-retry', req.body);
     const { requestId } = req.body;
     log('INFO', `Request ${requestId}: Received /api/trigger-retry`);
 
@@ -87,9 +98,11 @@ app.post('/api/trigger-retry', (req, res) => {
         resolve({ userRetrying: true });
         waitingForRetryResolvers.delete(requestId);
         res.json({ status: 'OK', message: 'Retry signal sent to backend task.' });
+        verboseExit('POST /api/trigger-retry', "Retry resolver executed");
     } else {
         log('WARN', `Request ${requestId}: No active action waiting for retry.`);
         res.status(404).json({ error: 'No active action waiting for retry, or request ID mismatched.' });
+        verboseExit('POST /api/trigger-retry', "No resolver found for this requestId");
     }
 });
 

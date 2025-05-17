@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+    console.debug('[DEBUG] DOMContentLoaded');
     const systemPromptEl = document.getElementById('systemPrompt');
     const modelAIdEl = document.getElementById('modelAId');
     const modelBIdEl = document.getElementById('modelBId');
@@ -17,12 +18,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let eventSource = null;
 
     function generateClientUUID() {
-        return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+        const uuid = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
             (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
         );
+        console.debug('[DEBUG] Generated client UUID:', uuid);
+        return uuid;
     }
 
     function displayMessageInHistory(role, content) {
+        console.debug(`[DEBUG] Displaying message. Role: ${role}, Content: ${content}`);
         const messageDiv = document.createElement('div');
         messageDiv.classList.add(role === 'user' ? 'user-message' : 'assistant-message');
         const span = document.createElement('span');
@@ -33,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     newConversationButton.addEventListener('click', () => {
+        console.debug('[DEBUG] New conversation click');
         clientConversationId = null;
         clientMessagesHistory = [];
         modelAResponseEl.textContent = '';
@@ -48,9 +53,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     sendButton.addEventListener('click', async () => {
+        console.debug('[DEBUG] Send button clicked');
         const userPrompt = userPromptEl.value.trim();
         if (!userPrompt) {
             statusAreaEl.textContent = 'User prompt cannot be empty.';
+            console.warn('[WARN] Empty user prompt');
             return;
         }
 
@@ -87,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({ message: `HTTP error ${response.status}`}));
+                console.error('[ERROR] Bad response from /api/chat:', errData);
                 throw new Error(errData.message || `Server error: ${response.status}`);
             }
 
@@ -110,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (message.startsWith('data: ')) {
                         try {
                             const data = JSON.parse(message.substring(5).trim());
+                            console.debug('[DEBUG] SSE data received:', data);
 
                             if (data.type === 'STATUS') {
                                 statusAreaEl.textContent = data.message;
@@ -152,16 +161,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         } catch (error) {
-            console.error("Error sending/streaming chat:", error);
+            console.error("[ERROR] Error sending/streaming chat:", error);
             statusAreaEl.textContent = `Error: ${error.message}`;
         } finally {
             sendButton.disabled = false;
+            console.debug('[DEBUG] Send button handler complete');
         }
     });
 
     retryActionButton.addEventListener('click', async () => {
+        console.debug('[DEBUG] Retry action button clicked');
         if (!currentRequestIdForRetry) {
             statusAreaEl.textContent = "No action to retry.";
+            console.warn('[WARN] No requestId for retry');
             return;
         }
         statusAreaEl.textContent = 'Signaling backend to retry action...';
@@ -177,9 +189,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusAreaEl.textContent = data.message + " Waiting for LMArena... (The previous stream should resume or a new one start if retry is processed)";
             } else {
                 statusAreaEl.textContent = `Retry signal failed: ${data.error}`;
+                console.error('[ERROR] Retry signal failed:', data.error);
             }
         } catch (error) {
             statusAreaEl.textContent = `Error sending retry signal: ${error.message}`;
+            console.error('[ERROR] Error sending retry:', error);
         } finally {
             retryActionButton.style.display = 'none';
             retryActionButton.disabled = false;

@@ -10,8 +10,18 @@ function log(level, message, ...args) {
     }
 }
 
-function generateUUID() {
-    return uuidv4();
+function verboseEntry(functionName, args) {
+    log('DEBUG', `Entering ${functionName} with args:`, args);
+}
+function verboseExit(functionName, result) {
+    log('DEBUG', `Exiting ${functionName} with result:`, result);
 }
 
-module.exports = { log, generateUUID };
+function generateUUID() {
+    verboseEntry('generateUUID', {});
+    const uuid = uuidv4();
+    verboseExit('generateUUID', uuid);
+    return uuid;
+}
+
+module.exports = { log, generateUUID, verboseEntry, verboseExit };
