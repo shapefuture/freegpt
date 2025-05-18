@@ -34,20 +34,76 @@ REQUIRED_ENV_VARS.forEach((envKey) => {
 });
 
 // Security & CORS
-app.use(helmet());
+app.set('trust proxy', 1); // Trust first proxy
+
+// Static list of models
+const AVAILABLE_MODELS = [
+  { id: 'gpt-4', name: 'GPT-4' },
+  { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
+  { id: 'claude-3-opus', name: 'Claude 3 Opus' },
+  { id: 'claude-3-sonnet', name: 'Claude 3 Sonnet' },
+  { id: 'gemini-pro', name: 'Gemini Pro' },
+  { id: 'llama-3-70b', name: 'Llama 3 70B' },
+  { id: 'llama-3-8b', name: 'Llama 3 8B' }
+];
+
+// Configure CSP with relaxed settings for development
+const cspDirectives = {
+  defaultSrc: ["'self'"],
+  scriptSrc: ["'self'", "'unsafe-inline'"],
+  styleSrc: ["'self'", "'unsafe-inline'"],
+  imgSrc: ["'self'", 'data:', 'https:'],
+  fontSrc: ["'self'", 'data:', 'https:'],
+  connectSrc: ["'self'"],
+  objectSrc: ["'none'"],
+  baseUri: ["'self'"],
+  formAction: ["'self'"],
+  frameAncestors: ["'none'"],
+  upgradeInsecureRequests: []
+};
+
+// Use helmet with minimal configuration
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: cspDirectives,
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false,
+  crossOriginResourcePolicy: false,
+  hsts: false // Disable HSTS for development
+}));
+
 app.use(cors({ origin: '*' }));
-app.use(rateLimit({ windowMs: 10 * 60 * 1000, max: 100 }));
+app.use(rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: 'Too many requests from this IP, please try again after 10 minutes'
+}));
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const waitingForRetryResolvers = new Map(); 
 
+// Serve static files with error handling
+app.use((req, res, next) => {
+  console.log(`Serving static file: ${req.path}`);
+  next();
+});
+
 app.get('/', (req, res) => {
     verboseEntry('GET /', { url: req.url, headers: req.headers });
     try {
-        res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-        verboseExit('GET /', "Sent index.html");
+        res.sendFile(path.join(__dirname, '..', 'public', 'index.html'), (err) => {
+            if (err) {
+                console.error('Error sending index.html:', err);
+                res.status(500).send('Error loading the application');
+            } else {
+                verboseExit('GET /', "Sent index.html");
+            }
+        });
     } catch (err) {
         log('ERROR', 'Failed to send index.html', err);
         res.status(500).send('Server error');
@@ -139,15 +195,15 @@ app.post('/api/trigger-retry', (req, res) => {
 
 // API: Dynamic Model List
 app.get('/api/models', async (req, res) => {
-  verboseEntry('GET /api/models', {});
-  try {
-    const page = await puppeteerManager.launchOrGetPage();
-    const models = await puppeteerManager.fetchAvailableModels(page, (data) => log('INFO', '/api/models sseSend', data));
-    res.json({ models });
-  } catch (e) {
-    log('ERROR', 'Error in /api/models:', e.message);
-    res.status(500).json({ error: 'Failed to fetch models' });
-  }
+    verboseEntry('GET /api/models', {});
+    try {
+        // Return the static list of models
+        verboseExit('GET /api/models', { modelCount: AVAILABLE_MODELS.length });
+        res.json({ models: AVAILABLE_MODELS });
+    } catch (err) {
+        log('ERROR', 'Failed to fetch models', err);
+        res.status(500).json({ error: 'Failed to fetch models' });
+    }
 });
 
 // Health check endpoint
@@ -173,13 +229,21 @@ app.use((err, req, res, next) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     log('INFO', `Server listening on port ${PORT}`);
-    puppeteerManager.initialize();
+    
+    // Initialize Puppeteer only when needed, not at server start
+    // puppeteerManager.initialize().catch(e => log('ERROR', 'Failed to initialize Puppeteer:', e));
+    
+    // Auto-open the browser when the server starts
+    const { exec } = require('child_process');
+    const url = `http://localhost:${PORT}`;
+    const start = (process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open');
+    exec(`${start} ${url}`);
+    console.log(`\nApplication is running at: ${url}\n`);
   });
 }
 
-// Export app for tests
 module.exports = app;
 
 process.on('SIGINT', async () => { 

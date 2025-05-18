@@ -1,8 +1,5 @@
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const { connect } = require('puppeteer-real-browser');
 const { log, generateUUID, verboseEntry, verboseExit } = require('./utils');
-
-puppeteer.use(StealthPlugin());
 
 let browserInstance = null;
 let currentPageInstance = null; 
@@ -40,34 +37,205 @@ async function launchOrGetPage() {
                 try {
                     await currentPageInstance.goto('about:blank', {waitUntil: 'networkidle2'});
                     log('DEBUG', 'Reusing existing page, navigated to about:blank.');
+                    return currentPageInstance;
                 } catch (e) {
                     log('WARN', 'Failed to navigate existing page to about:blank, creating new.', e.message);
                     try { await currentPageInstance.close(); } catch (closeErr) { log('WARN', 'Error closing page', closeErr); }
-                    currentPageInstance = await browserInstance.newPage();
                 }
-            } else {
-                currentPageInstance = await browserInstance.newPage();
-                log('DEBUG', 'Created new page in existing browser.');
             }
-        } else {
-            log('INFO', 'Launching new browser instance...');
-            const headlessMode = process.env.PUPPETEER_HEADLESS === 'true' ? 'new' : false;
-            const launchOptions = {
-                headless: headlessMode,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--disable-gpu'
-                ]
-            };
-            if (process.env.PROXY_SERVER_URL) {
-                launchOptions.args.push(`--proxy-server=${process.env.PROXY_SERVER_URL}`);
-            }
-            browserInstance = await puppeteer.launch(launchOptions);
+        }
+
+        log('INFO', 'Launching new browser instance with puppeteer-real-browser...');
+        
+        // Check if we're running in a Docker container
+        const isDocker = process.env.IS_DOCKER === 'true' || process.env.CONTAINER === 'docker';
+
+        // Connect using puppeteer-real-browser
+        const result = await connect({
+            headless: process.env.PUPPETEER_HEADLESS === 'true' ? 'new' : false,
+            turnstile: true, // Enable Turnstile CAPTCHA bypass
+            ignoreAllFlags: true, // Override all initialization arguments
+            connectOption: {
+                defaultViewport: null,
+            },
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-infobars',
+                '--window-size=1920,1080',
+                '--start-maximized',
+                '--disable-popup-blocking',
+                '--disable-notifications',
+                '--disable-web-security',
+                '--disable-features=IsolateOrigins,site-per-process',
+                '--disable-site-isolation-trials',
+                '--disable-blink-features',
+                '--disable-webgl',
+                '--disable-threaded-animation',
+                '--disable-in-process-stack-traces',
+                '--disable-breakpad',
+                '--disable-client-side-phishing-detection',
+                '--disable-component-update',
+                '--disable-default-apps',
+                '--disable-extensions',
+                '--disable-sync',
+                '--metrics-recording-only',
+                '--mute-audio',
+                '--no-default-browser-check',
+                '--no-pings',
+                '--password-store=basic',
+                '--use-mock-keychain',
+                '--single-process',
+                '--disable-3d-apis',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--disable-ipc-flooding-protection',
+                '--enable-features=NetworkService,NetworkServiceInProcess',
+                '--disable-background-networking',
+                '--disable-client-side-phishing-detection',
+                '--disable-default-apps',
+                '--disable-hang-monitor',
+                '--disable-sync',
+                '--metrics-recording-only',
+                '--safebrowsing-disable-auto-update',
+                '--password-store=basic',
+                '--use-mock-keychain',
+                '--hide-scrollbars',
+                '--mute-audio',
+                '--no-default-browser-check',
+                '--no-pings',
+                '--no-sandbox',
+                '--no-zygote',
+                '--single-process',
+                '--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
+            ],
+            ignoreDefaultArgs: [
+                '--enable-automation',
+                '--enable-blink-features',
+                '--enable-logging',
+                '--log-level=0',
+                '--remote-debugging-port=0',
+                '--remote-debugging-address=0.0.0.0',
+                '--enable-features=NetworkService',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--disable-ipc-flooding-protection',
+                '--disable-background-networking',
+                '--disable-client-side-phishing-detection',
+                '--disable-default-apps',
+                '--disable-hang-monitor',
+                '--disable-sync',
+                '--metrics-recording-only',
+                '--safebrowsing-disable-auto-update',
+                '--password-store=basic',
+                '--use-mock-keychain',
+                '--hide-scrollbars',
+                '--mute-audio',
+                '--no-default-browser-check',
+                '--no-pings',
+                '--no-sandbox',
+                '--no-zygote',
+                '--single-process'
+            ],
+            ignoreHTTPSErrors: true,
+            timeout: 60000,
+            dumpio: false,
+            pipe: true,
+            env: {
+                ...process.env,
+                DISPLAY: process.env.DISPLAY || (isDocker ? ':99' : ':0'),
+                LANG: 'en_US.UTF-8',
+                LANGUAGE: 'en_US:en',
+                LC_ALL: 'en_US.UTF-8',
+                NO_AT_BRIDGE: '1',
+                XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR || '/tmp/xdg-runtime-dir',
+                TMPDIR: process.env.TMPDIR || '/tmp',
+                TMP: process.env.TMP || '/tmp',
+                TEMP: process.env.TEMP || '/tmp',
+                HOME: process.env.HOME || '/tmp'
+            },
+            ignoreAllFlags: true, // Override all initialization arguments
+            connectOptions: {
+                defaultViewport: null
+            },
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-infobars',
+                '--window-size=1920,1080',
+                '--start-maximized',
+                '--disable-popup-blocking',
+                '--disable-notifications',
+                '--disable-web-security',
+                '--disable-features=IsolateOrigins,site-per-process',
+                '--disable-site-isolation-trials',
+                '--disable-blink-features',
+                '--disable-webgl',
+                '--disable-threaded-animation',
+                '--disable-in-process-stack-traces',
+                '--disable-breakpad',
+                '--disable-client-side-phishing-detection',
+                '--disable-component-update',
+                '--disable-default-apps',
+                '--disable-extensions',
+                '--disable-sync',
+                '--metrics-recording-only',
+                '--mute-audio',
+                '--no-default-browser-check',
+                '--no-pings',
+                '--password-store=basic',
+                '--use-mock-keychain',
+                '--single-process',
+                '--disable-3d-apis',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--disable-ipc-flooding-protection',
+                '--enable-features=NetworkService,NetworkServiceInProcess',
+                '--disable-background-networking'
+                ],
+                ignoreDefaultArgs: [
+                    '--enable-automation',
+                    '--enable-blink-features',
+                    '--enable-logging',
+                    '--log-level=0',
+                    '--remote-debugging-port=0',
+                    '--remote-debugging-address=0.0.0.0'
+                ],
+                ignoreHTTPSErrors: true,
+                timeout: 60000,
+                dumpio: false,
+                pipe: true,
+                env: {
+                    ...process.env,
+                    DISPLAY: process.env.DISPLAY || (isDocker ? ':99' : ':0'),
+                    LANG: 'en_US.UTF-8',
+                    LANGUAGE: 'en_US:en',
+                    LC_ALL: 'en_US.UTF-8',
+                    NO_AT_BRIDGE: '1',
+                    XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR || '/tmp/xdg-runtime-dir',
+                    TMPDIR: process.env.TMPDIR || '/tmp',
+                    TMP: process.env.TMP || '/tmp',
+                    TEMP: process.env.TEMP || '/tmp',
+                    HOME: process.env.HOME || '/tmp'
+                }
+            });
+            
+            browserInstance = result.browser;
             log('INFO', 'Browser instance launched.');
             browserInstance.on('disconnected', () => {
                 log('WARN', 'Browser disconnected!');
@@ -76,12 +244,153 @@ async function launchOrGetPage() {
             });
             currentPageInstance = await browserInstance.newPage();
             log('DEBUG', 'Created new page in new browser.');
-        }
 
-        await currentPageInstance.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36');
-        await currentPageInstance.setViewport({ width: 1366, height: 768 });
+            // Set a realistic viewport
+            await currentPageInstance.setViewport({
+                width: 1920,
+                height: 1080,
+                deviceScaleFactor: 1,
+                hasTouch: false,
+                isLandscape: false,
+                isMobile: false,
+            });
 
+            // Update browser and page instances
+            browserInstance = result.browser;
+            currentPageInstance = result.page;
+
+            log('INFO', 'Successfully launched browser with puppeteer-real-browser');
+
+            // Set extra HTTP headers
+            await currentPageInstance.setExtraHTTPHeaders({
+                'accept-language': 'en-US,en;q=0.9',
+                'sec-ch-ua': '"Google Chrome";v="123", "Not:A-Brand";v="8"',
+                'sec-ch-ua-mobile': '?0',
+                'sec-ch-ua-platform': 'macOS',
+            });
+            
+            // Bypass Cloudflare and other bot protections
+            await currentPageInstance.setJavaScriptEnabled(true);
+            await currentPageInstance.setBypassCSP(true);
+            
+            // Set geolocation and timezone
+            const context = currentPageInstance.browserContext();
+            await context.overridePermissions(LMARENA_URL, ['geolocation']);
+            await currentPageInstance.setGeolocation({latitude: 37.7749, longitude: -122.4194});
+            
+            // Set viewport with some randomness to appear more human-like
+            const viewportWidth = 1920 + Math.floor(Math.random() * 100) - 50;
+            const viewportHeight = 1080 + Math.floor(Math.random() * 100) - 50;
+            await currentPageInstance.setViewport({
+                width: viewportWidth,
+                height: viewportHeight,
+                deviceScaleFactor: 1,
+                hasTouch: false,
+                isLandscape: false,
+                isMobile: false,
+            });
+
+            // Set a realistic user agent
+            const userAgents = [
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.4 Safari/605.1.15',
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0'
+            ];
+            const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+            await currentPageInstance.setUserAgent(randomUserAgent);
+            
+            // Set timezone for the page
+            await currentPageInstance.evaluateOnNewDocument(() => {
+                try {
+                    const timezones = [
+                        'America/New_York',
+                        'America/Chicago',
+                        'America/Denver',
+                        'America/Los_Angeles',
+                        'Europe/London',
+                        'Europe/Paris',
+                        'Asia/Tokyo',
+                        'Australia/Sydney'
+                    ];
+                    const randomTz = timezones[Math.floor(Math.random() * timezones.length)];
+                    
+                    // Override timezone if Intl is available
+                    if (window.Intl && window.Intl.DateTimeFormat) {
+                        Object.defineProperty(Intl, 'DateTimeFormat', {
+                            value: class extends Intl.DateTimeFormat {
+                                constructor(locales, options) {
+                                    const opts = options || {};
+                                    super(locales, { ...opts, timeZone: opts.timeZone || randomTz });
+                            }
+                        },
+                        configurable: true
+                    });
+                }
+            } catch (e) {
+                console.error('Error setting timezone:', e);
+            }
+        });
+        
+        // Set timeouts
+        await currentPageInstance.setDefaultNavigationTimeout(60000);
+        await currentPageInstance.setDefaultTimeout(60000);
+        
+        // Setup Turnstile proxy if it exists
         await currentPageInstance.evaluateOnNewDocument(() => {
+            window.capturedTurnstileParams = {};
+            const originalTurnstileRender = window.turnstile?.render;
+            if (originalTurnstileRender) {
+                window.turnstile = new Proxy(window.turnstile, {
+                    get(target, prop) {
+                        if (prop === 'render') {
+                            return function(element, options) {
+                                window.capturedTurnstileParams = { 
+                                    sitekey: options.sitekey, 
+                                    action: options.action, 
+                                    cData: options.cData, 
+                                    chlPageData: options.chlPageData, 
+                                    callbackName: options.callback?.name 
+                                };
+                                return originalTurnstileRender.apply(target, [element, options]);
+                            };
+                        }
+                        return target[prop];
+                    }
+                });
+            }
+        });
+        
+        verboseExit('puppeteerManager.launchOrGetPage', 'Page ready');
+            // Set up Turnstile proxy and timezone in a single evaluateOnNewDocument call
+            await currentPageInstance.evaluateOnNewDocument(() => {
+                // Set up timezone
+                const timezones = [
+                    'America/New_York',
+                    'America/Chicago',
+                    'America/Denver',
+                    'America/Los_Angeles',
+                    'Europe/London',
+                    'Europe/Paris',
+                    'Asia/Tokyo',
+                    'Australia/Sydney'
+                ];
+                const randomTz = timezones[Math.floor(Math.random() * timezones.length)];
+                
+                // Override timezone if Intl is available
+                if (window.Intl && window.Intl.DateTimeFormat) {
+                    Object.defineProperty(Intl, 'DateTimeFormat', {
+                        value: class extends Intl.DateTimeFormat {
+                            constructor(locales, options) {
+                                const opts = options || {};
+                                super(locales, { ...opts, timeZone: opts.timeZone || randomTz });
+                        }
+                    },
+                    configurable: true
+                });
+            }
+            
+            // Set up Turnstile proxy
             window.capturedTurnstileParams = {};
             const originalTurnstileRender = window.turnstile?.render;
             if (originalTurnstileRender) {
@@ -141,7 +450,350 @@ async function closeBrowser() {
     }
 }
 
+// Function to handle Terms of Service modal
+async function handleTosModal(page) {
+    try {
+        // Wait for the ToS modal to appear with a timeout
+        const tosModal = await page.waitForSelector('form[action*="tos"]', { timeout: 10000 }).catch(() => null);
+        if (!tosModal) return false;
+        
+        log('INFO', 'ToS modal detected, attempting to handle...');
+        
+        // Handle the ToS modal in the page context
+        const tosHandled = await page.evaluate(async () => {
+            try {
+                const form = document.querySelector('form[action*="tos"]');
+                if (!form) return false;
+
+                const agreeButton = form.querySelector('button[type="submit"]');
+                const content = form.querySelector('.overflow-y-auto');
+                
+                if (!agreeButton || !content) return false;
+
+                // Function to check if scrolled to bottom
+                const isScrolledToBottom = () => {
+                    const { scrollTop, scrollHeight, clientHeight } = content;
+                    return Math.abs(scrollHeight - scrollTop - clientHeight) < 10;
+                };
+
+                // Enable the button if needed
+                if (agreeButton.disabled) {
+                    agreeButton.disabled = false;
+                    agreeButton.style.pointerEvents = 'auto';
+                    agreeButton.style.opacity = '1';
+                }
+
+                // Scroll to bottom if needed
+                if (!isScrolledToBottom()) {
+                    content.scrollTop = content.scrollHeight;
+                    // Wait for scroll to complete
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
+                // Click the button if it's enabled
+                if (!agreeButton.disabled) {
+                    agreeButton.click();
+                    return true;
+                }
+                
+                return false;
+            } catch (error) {
+                console.error('Error in ToS modal handler:', error);
+                return false;
+            }
+        });
+        
+        if (tosHandled) {
+            log('INFO', 'Successfully handled ToS modal');
+            // Wait for navigation to complete
+            await page.waitForNavigation({ waitUntil: 'networkidle0' }).catch(() => {});
+        }
+        
+        return tosHandled;
+    } catch (error) {
+        log('ERROR', 'Error in handleTosModal:', error);
+        return false;
+    }
+}
+
+const TurnstileSolver = require('./utils/turnstileSolver');
+
+// Helper function to handle CAPTCHA if it appears
+async function handleCaptchaIfPresent(page, sseSend) {
+    try {
+        // First, check for Turnstile CAPTCHA
+        const turnstileDetected = await page.evaluate(() => {
+            return !!document.querySelector('iframe[src*="challenges.cloudflare.com/turnstile"]');
+        });
+
+        if (turnstileDetected) {
+            sseSend({ type: 'STATUS', message: 'Cloudflare Turnstile detected. Attempting to solve...' });
+            
+            // Get the current URL and sitekey
+            const { url, sitekey, action, cdata } = await page.evaluate(() => {
+                const turnstileIframe = document.querySelector('iframe[src*="challenges.cloudflare.com/turnstile"]');
+                const sitekey = turnstileIframe?.getAttribute('data-sitekey') || 
+                               turnstileIframe?.parentElement?.getAttribute('data-sitekey') ||
+                               window.capturedTurnstileParams?.sitekey;
+                
+                const action = window.capturedTurnstileParams?.action || 'verify';
+                const cdata = window.capturedTurnstileParams?.cData || null;
+                
+                return {
+                    url: window.location.href,
+                    sitekey,
+                    action,
+                    cdata
+                };
+            });
+
+            if (!sitekey) {
+                sseSend({ type: 'WARNING', message: 'Could not extract Turnstile sitekey. Falling back to manual CAPTCHA solving.' });
+                return true; // Still return true to indicate CAPTCHA was detected
+            }
+
+            // Initialize the Turnstile solver
+            const solver = new TurnstileSolver({
+                debug: process.env.DEBUG === 'true',
+                headless: process.env.HEADLESS !== 'false',
+                userAgent: await page.evaluate(() => window.navigator.userAgent)
+            });
+
+            try {
+                // Try to solve the Turnstile
+                const result = await solver.solve(url, sitekey, action, cdata);
+                
+                if (result.success) {
+                    sseSend({ 
+                        type: 'SUCCESS', 
+                        message: `Successfully solved Turnstile in ${result.timeElapsed}ms` 
+                    });
+                    
+                    // Inject the token into the page
+                    await page.evaluate((token) => {
+                        // Find all Turnstile response textareas and set the token
+                        document.querySelectorAll('textarea[name="cf-turnstile-response"]').forEach(el => {
+                            el.value = token;
+                            // Trigger any necessary events
+                            const event = new Event('input', { bubbles: true });
+                            el.dispatchEvent(event);
+                            
+                            // If there's a form, try to submit it
+                            const form = el.closest('form');
+                            if (form) {
+                                form.dispatchEvent(new Event('submit', { cancelable: true }));
+                            }
+                        });
+                    }, result.token);
+                    
+                    // Wait for any potential form submission
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    return true;
+                } else {
+                    sseSend({ 
+                        type: 'WARNING', 
+                        message: `Failed to solve Turnstile automatically: ${result.error}. Falling back to manual solving.` 
+                    });
+                    return true; // Still return true to indicate CAPTCHA was detected
+                }
+            } catch (error) {
+                log('ERROR', 'Error in Turnstile solver:', error);
+                sseSend({ 
+                    type: 'WARNING', 
+                    message: `Error solving Turnstile: ${error.message}. Falling back to manual solving.` 
+                });
+                return true; // Still return true to indicate CAPTCHA was detected
+            } finally {
+                await solver.close();
+            }
+        }
+
+        // Fallback to checking for other CAPTCHA types (reCAPTCHA, hCaptcha, etc.)
+        const captchaFrame = await page.frames().find(frame => {
+            return frame && frame.url() && 
+                   (frame.url().includes('recaptcha') || 
+                   frame.url().includes('hcaptcha'));
+        });
+
+        if (captchaFrame) {
+            sseSend({ type: 'STATUS', message: 'CAPTCHA detected. Please complete the CAPTCHA in the browser window.' });
+            await page.bringToFront();
+            
+            // Wait for CAPTCHA to be solved (you'll need to do this manually)
+            await page.waitForFunction(
+                () => document.visibilityState === 'visible',
+                { timeout: 0 }
+            );
+            
+            // Wait a bit after CAPTCHA is presumably solved
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            return true;
+        }
+        
+        return false;
+    } catch (error) {
+        log('ERROR', 'Error in handleCaptchaIfPresent:', error);
+        return false;
+    }
+}
+
+// Function to handle any dialogs that appear during interaction and ensure buttons are enabled
+async function handleDialogs(page, sseSend) {
+    return new Promise(async (resolve) => {
+        try {
+            // First try to handle ToS modal
+            const tosHandled = await handleTosModal(page);
+            if (tosHandled) {
+                log('DEBUG', 'Successfully handled ToS modal');
+                resolve(true);
+                return;
+            }
+
+            // Then try to handle warning dialogs
+            const warningHandled = await page.evaluate(() => {
+                try {
+                    // Look for warning dialogs
+                    const warningDialogs = Array.from(document.querySelectorAll('div[role="dialog"]')).filter(dialog => {
+                        const text = dialog.textContent || '';
+                        return text.includes('Warning') || text.includes('warning');
+                    });
+
+                    if (warningDialogs.length > 0) {
+                        // Try to find and click the first available button
+                        const buttons = warningDialogs.flatMap(dialog => 
+                            Array.from(dialog.querySelectorAll('button'))
+                        );
+
+                        const buttonTexts = ['OK', 'Ok', 'Okay', 'I understand', 'Got it', 'Dismiss', 'Close'];
+                        
+                        // Try to find a button with common text
+                        for (const text of buttonTexts) {
+                            const button = buttons.find(btn => 
+                                btn.textContent && btn.textContent.trim().toLowerCase() === text.toLowerCase()
+                            );
+                            if (button) {
+                                button.click();
+                                return true;
+                            }
+                        }
+
+                        // If no button found by text, try to click any non-disabled button
+                        const clickableButton = buttons.find(btn => !btn.disabled);
+                        if (clickableButton) {
+                            clickableButton.click();
+                            return true;
+                        }
+                    }
+                    return false;
+                } catch (e) {
+                    console.error('Error handling warning dialog:', e);
+                    return false;
+                }
+            });
+
+            if (warningHandled) {
+                log('DEBUG', 'Handled warning dialog');
+                resolve(true);
+                return;
+            }
+            
+            // Then try to enable any other disabled buttons
+            const buttonEnabled = await page.evaluate(() => {
+                try {
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    let found = false;
+                    
+                    buttons.forEach(btn => {
+                        // Check if button is a send button or similar
+                        const isSendButton = 
+                            (btn.textContent?.includes('Send') || 
+                             btn.getAttribute('aria-label')?.includes('Send') ||
+                             btn.querySelector('svg[aria-label="Send"]')) &&
+                            (btn.disabled || btn.getAttribute('aria-disabled') === 'true' || 
+                             btn.classList.contains('opacity-50') || 
+                             btn.classList.contains('pointer-events-none'));
+                        
+                        if (isSendButton) {
+                            btn.removeAttribute('disabled');
+                            btn.removeAttribute('aria-disabled');
+                            btn.style.pointerEvents = 'auto';
+                            btn.style.opacity = '1';
+                            btn.classList.remove('disabled', 'opacity-50', 'pointer-events-none');
+                            found = true;
+                        }
+                    });
+                    
+                    return found;
+                } catch (e) {
+                    console.error('Error in button enable script:', e);
+                    return false;
+                }
+            });
+            
+            if (buttonEnabled) {
+                log('DEBUG', 'Enabled potentially disabled buttons');
+            }
+
+            // Set up a dialog handler
+            const dialogHandler = async (dialog) => {
+                const message = dialog.message();
+                log('DEBUG', `Dialog appeared: ${message.substring(0, 100)}...`);
+                
+                try {
+                    // For warning dialogs, we'll dismiss them
+                    if (message.toLowerCase().includes('warning') || message.toLowerCase().includes('terms of service')) {
+                        log('DEBUG', 'Dismissing dialog');
+                        await dialog.dismiss();
+                        // After dismissing, try to enable buttons again
+                        await page.evaluate(() => {
+                            document.querySelectorAll('button').forEach(btn => {
+                                if (btn.disabled || 
+                                    btn.getAttribute('aria-disabled') === 'true' || 
+                                    btn.classList.contains('opacity-50') || 
+                                    btn.classList.contains('pointer-events-none')) {
+                                    btn.removeAttribute('disabled');
+                                    btn.removeAttribute('aria-disabled');
+                                    btn.style.pointerEvents = 'auto';
+                                    btn.style.opacity = '1';
+                                    btn.classList.remove('opacity-50', 'pointer-events-none');
+                                }
+                            });
+                        });
+                    } else {
+                        await dialog.accept();
+                    }
+                    sseSend({ type: 'STATUS', message: 'Dialog handled' });
+                } catch (e) {
+                    log('WARN', 'Error handling dialog:', e);
+                    try {
+                        await dialog.dismiss();
+                    } catch (e2) {
+                        log('ERROR', 'Error dismissing dialog:', e2);
+                    }
+                }
+                resolve(true);
+            };
+            
+            // Listen for dialogs
+            page.on('dialog', dialogHandler);
+            
+            // Set a timeout to resolve if no dialog appears
+            setTimeout(() => {
+                page.off('dialog', dialogHandler);
+                resolve(false);
+            }, 3000); // Reduced timeout to 3 seconds for faster response
+            
+        } catch (e) {
+            log('ERROR', 'Error in dialog handler:', e);
+            resolve(false);
+        }
+    });
+}
+
 async function interactWithLMArena(page, options, sseSend, waitForUserRetrySignal) {
+    // First, try to handle ToS modal if it appears
+    await handleTosModal(page);
+    log('DEBUG', `interactWithLMArena called with requestId: ${options.requestId}`);
     verboseEntry('puppeteerManager.interactWithLMArena', { options });
     const { userPrompt, systemPrompt, targetModelA, targetModelB, clientConversationId, clientMessagesHistory, requestId } = options;
     let attempt = 0;
@@ -152,16 +804,116 @@ async function interactWithLMArena(page, options, sseSend, waitForUserRetrySigna
         log('INFO', `Request ${requestId}: LMArena interaction attempt #${attempt}`);
         sseSend({ type: 'STATUS', message: `Attempting interaction with LMArena (Attempt ${attempt})...` });
 
+        log('DEBUG', `Attempting to navigate to ${LMARENA_URL}`);
         try {
-            await page.goto(LMARENA_URL, { waitUntil: 'networkidle2', timeout: 60000 });
+            // Navigate to the page with a longer timeout
+            await page.goto(LMARENA_URL, { 
+                waitUntil: 'networkidle2', 
+                timeout: 120000, // 2 minute timeout
+                referer: 'https://www.google.com/',
+            });
+            
+            // Check for CAPTCHA
+            const captchaDetected = await handleCaptchaIfPresent(page, sseSend);
+            if (captchaDetected) {
+                sseSend({ type: 'STATUS', message: 'Please complete the CAPTCHA and press Enter to continue...' });
+                await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 300000 }); // 5 minute timeout
+            }
+            
+            log('DEBUG', `Successfully navigated to ${LMARENA_URL}`);
             sseSend({ type: 'STATUS', message: 'Navigated to LMArena.' });
+            
+            // Wait for the page to be fully loaded
+            await page.waitForSelector('body', { timeout: 30000 });
+            
+            // Dismiss any modals or popups with more robust handling
+            try {
+                // Wait for the page to be fully interactive
+                await page.waitForFunction(
+                    () => document.readyState === 'complete',
+                    { timeout: 10000 }
+                );
+
+                // Try multiple approaches to find and click the accept button
+                const clickAcceptButton = async () => {
+                    // Try different selectors and text patterns
+                    const selectors = [
+                        'button:has-text("Accept")',
+                        'button:has-text("Agree")',
+                        'button:has-text("I agree")',
+                        'button:has-text("Got it")',
+                        'button:has-text("Continue")',
+                        'button[aria-label*="Accept"]',
+                        'button[aria-label*="Agree"]',
+                        'button[data-testid*="accept"]',
+                        'button[data-testid*="agree"]',
+                        'button:not([disabled]):has(div:has-text("Accept"))',
+                        'button:not([disabled]):has(div:has-text("Agree"))'
+                    ];
+
+                    for (const selector of selectors) {
+                        try {
+                            const button = await page.$(selector);
+                            if (button) {
+                                log('DEBUG', `Found button with selector: ${selector}`);
+                                
+                                // Scroll into view and click with proper waiting
+                                await button.evaluate(btn => btn.scrollIntoView({behavior: 'smooth', block: 'center'}));
+                                await page.waitForTimeout(500);
+                                
+                                // Try multiple click methods
+                                try {
+                                    await button.click({delay: 100});
+                                } catch (e) {
+                                    log('DEBUG', 'First click attempt failed, trying alternative click method');
+                                    await button.evaluate(btn => {
+                                        btn.dispatchEvent(new MouseEvent('click', {
+                                            view: window,
+                                            bubbles: true,
+                                            cancelable: true
+                                        }));
+                                    });
+                                }
+                                
+                                log('DEBUG', 'Successfully clicked accept button');
+                                await page.waitForTimeout(1000); // Wait for any animations
+                                return true;
+                            }
+                        } catch (e) {
+                            log('DEBUG', `Error with selector ${selector}:`, e.message);
+                        }
+                    }
+                    return false;
+                };
+
+                // Try clicking the accept button
+                let clicked = await clickAcceptButton();
+                
+                // If no button found, try waiting a bit and try again
+                if (!clicked) {
+                    await page.waitForTimeout(2000);
+                    clicked = await clickAcceptButton();
+                }
+                
+                if (!clicked) {
+                    log('INFO', 'No accept button found after multiple attempts');
+                    sseSend({ type: 'STATUS', message: 'Please check the browser window and manually accept any dialogs if needed.' });
+                }
+                
+            } catch (e) {
+                log('ERROR', 'Error handling popups:', e);
+                sseSend({ type: 'ERROR', message: 'Error handling website dialogs. Please check the browser window.' });
+            }
 
             const cookies = await page.cookies(LMARENA_URL);
             const authCookie = cookies.find(cookie => cookie.name === 'arena-auth-prod-v1');
             const supabaseJWT = authCookie ? authCookie.value : null;
             if (!supabaseJWT) log('WARN', `Request ${requestId}: Supabase JWT (arena-auth-prod-v1) not found.`);
+            // Set up dialog handling before any interaction
+            const dialogPromise = handleDialogs(page, sseSend);
             
-            await page.setRequestInterception(true);
+            // Set up request interception for API calls
+            page.setRequestInterception(true);
             let apiRequestProcessed = false;
             let turnstileTokenFromPage = null;
 
@@ -262,8 +1014,42 @@ async function interactWithLMArena(page, options, sseSend, waitForUserRetrySigna
             await page.waitForSelector(PROMPT_TEXTAREA_SELECTOR, { timeout: 10000 });
             await page.type(PROMPT_TEXTAREA_SELECTOR, userPrompt, {delay: 50 + Math.random() * 50});
             
-            await page.waitForSelector(SEND_BUTTON_SELECTOR, { timeout: 5000 });
-            await page.click(SEND_BUTTON_SELECTOR);
+            // Wait for the send button and ensure it's clickable
+            const sendButton = await page.waitForSelector(SEND_BUTTON_SELECTOR, { 
+                visible: true,
+                timeout: 10000 
+            }).catch(() => null);
+            
+            if (!sendButton) {
+                throw new Error('Send button not found');
+            }
+            
+            // Ensure the button is enabled and clickable
+            await page.evaluate(btn => {
+                btn.removeAttribute('disabled');
+                btn.removeAttribute('aria-disabled');
+                btn.style.pointerEvents = 'auto';
+                btn.style.opacity = '1';
+                btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, sendButton);
+            
+            // Add a small delay to ensure the button is ready
+            await page.waitForTimeout(500);
+            
+            // Try multiple ways to click the button
+            try {
+                await sendButton.click();
+            } catch (e) {
+                log('WARN', 'Standard click failed, trying alternative click method');
+                await page.evaluate(btn => {
+                    const event = new MouseEvent('click', {
+                        view: window,
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    btn.dispatchEvent(event);
+                }, sendButton);
+            }
             log('INFO', `Request ${requestId}: Prompt submitted to LMArena page.`);
             sseSend({ type: 'STATUS', message: 'Prompt submitted. Waiting for models...' });
 
