@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free Rotating Proxy Manager</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #0069d9;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .loading {
+            color: #6c757d;
+            font-style: italic;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .badge-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .badge-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .badge-warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .badge-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        .current-proxy {
+            background-color: #e8f4f8;
+            border-left: 4px solid #007bff;
+        }
+        .status-message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .refresh-icon {
+            cursor: pointer;
+            color: #6c757d;
+            margin-left: 10px;
+        }
+        .refresh-icon:hover {
+            color: #007bff;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active {
+            border-bottom: 2px solid #007bff;
+            font-weight: 500;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Free Rotating Proxy Manager</h1>
+
+    <div class="container">
+        <h2>Proxy Statistics <span class="refresh-icon" onclick="loadStats()">🔄</span></h2>
+        <div class="stats" id="stats-container">
+            <div class="stat-card">
+                <div class="stat-label">Total Proxies</div>
+                <div class="stat-value" id="total-proxies">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active Proxies</div>
+                <div class="stat-value" id="active-proxies">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">LMArena Compatible</div>
+                <div class="stat-value" id="lmarena-proxies">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Last Fetch</div>
+                <div class="stat-value" id="last-fetch">-</div>
+            </div>
+        </div>
+
+        <div class="current-proxy-info" id="current-proxy-info">
+            <h3>Current Proxy</h3>
+            <div id="current-proxy-details">No proxy selected</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Proxy Actions</h2>
+        <div class="actions">
+            <button id="fetch-btn" onclick="fetchProxies()">Fetch New Proxies</button>
+            <button id="test-btn" onclick="testProxies()">Test Proxies</button>
+            <button id="test-lmarena-btn" onclick="testProxiesWithLMArena()">Test with LMArena</button>
+            <button id="rotate-btn" onclick="rotateProxy()">Rotate Proxy</button>
+            <button id="rotate-lmarena-btn" onclick="rotateLMArenaProxy()">Rotate LMArena Proxy</button>
+        </div>
+        <div id="status-message"></div>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('active-proxies-tab')">Active Proxies</div>
+            <div class="tab" onclick="showTab('all-proxies-tab')">All Proxies</div>
+        </div>
+
+        <div class="tab-content active" id="active-proxies-tab">
+            <h2>Active Proxies <span class="refresh-icon" onclick="loadProxies('active')">🔄</span></h2>
+            <div id="active-proxies-table">Loading...</div>
+        </div>
+
+        <div class="tab-content" id="all-proxies-tab">
+            <h2>All Proxies <span class="refresh-icon" onclick="loadProxies('all')">🔄</span></h2>
+            <div id="all-proxies-table">Loading...</div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            loadProxies('active');
+            loadProxies('all');
+        });
+
+        // Show tab
+        function showTab(tabId) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Deactivate all tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabId).classList.add('active');
+
+            // Activate selected tab button
+            const index = tabId === 'active-proxies-tab' ? 0 : 1;
+            document.querySelectorAll('.tab')[index].classList.add('active');
+        }
+
+        // Load proxy statistics
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/free-proxy/stats');
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('total-proxies').textContent = data.stats.total || 0;
+                    document.getElementById('active-proxies').textContent = data.stats.active || 0;
+                    document.getElementById('lmarena-proxies').textContent = data.stats.lmarenaCompatible || 0;
+
+                    // Format last fetch time
+                    const lastFetch = data.stats.lastFetchTime ?
+                        new Date(data.stats.lastFetchTime).toLocaleString() : 'Never';
+                    document.getElementById('last-fetch').textContent = lastFetch;
+
+                    // Display current proxy
+                    const currentProxy = data.stats.currentProxy;
+                    if (currentProxy) {
+                        let lmarenaCompatible = '';
+                        if (currentProxy.worksWithLMArena === true) {
+                            const method = currentProxy.lmarenaTestMethod ? ` (${currentProxy.lmarenaTestMethod})` : '';
+                            lmarenaCompatible = `<span class="badge badge-success">LMArena Compatible${method}</span>`;
+                        } else if (currentProxy.worksWithLMArena === false) {
+                            lmarenaCompatible = '<span class="badge badge-danger">Not LMArena Compatible</span>';
+                        } else {
+                            lmarenaCompatible = '<span class="badge badge-warning">LMArena Untested</span>';
+                        }
+
+                        document.getElementById('current-proxy-details').innerHTML = `
+                            <p><strong>URL:</strong> ${currentProxy.url}</p>
+                            <p><strong>Source:</strong> ${currentProxy.source}</p>
+                            <p><strong>Added:</strong> ${new Date(currentProxy.added).toLocaleString()}</p>
+                            <p><strong>Last Tested:</strong> ${currentProxy.lastTested ? new Date(currentProxy.lastTested).toLocaleString() : 'Never'}</p>
+                            <p><strong>LMArena:</strong> ${lmarenaCompatible}</p>
+                            ${currentProxy.ip ? `<p><strong>IP:</strong> ${currentProxy.ip}</p>` : ''}
+                        `;
+                    } else {
+                        document.getElementById('current-proxy-details').textContent = 'No active proxy selected';
+                    }
+                } else {
+                    console.error('Failed to load stats:', data.error);
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load proxy list
+        async function loadProxies(type = 'active') {
+            const containerId = type === 'active' ? 'active-proxies-table' : 'all-proxies-table';
+            document.getElementById(containerId).innerHTML = '<p class="loading">Loading proxies...</p>';
+
+            try {
+                const response = await fetch(`/api/free-proxy/list?type=${type}&limit=100`);
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.proxies.length === 0) {
+                        document.getElementById(containerId).innerHTML = '<p>No proxies found</p>';
+                        return;
+                    }
+
+                    // Create table
+                    let tableHtml = `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>URL</th>
+                                    <th>Source</th>
+                                    <th>Added</th>
+                                    <th>Last Tested</th>
+                                    <th>Status</th>
+                                    <th>LMArena</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    // Add rows
+                    data.proxies.forEach(proxy => {
+                        const status = proxy.working === true ?
+                            '<span class="badge badge-success">Working</span>' :
+                            (proxy.working === false ?
+                                '<span class="badge badge-danger">Failed</span>' :
+                                '<span class="badge badge-warning">Untested</span>');
+
+                        let lmarenaStatus = '';
+                        if (proxy.worksWithLMArena === true) {
+                            const method = proxy.lmarenaTestMethod ? ` (${proxy.lmarenaTestMethod})` : '';
+                            lmarenaStatus = `<span class="badge badge-success">Compatible${method}</span>`;
+                        } else if (proxy.worksWithLMArena === false) {
+                            lmarenaStatus = '<span class="badge badge-danger">Not Compatible</span>';
+                        } else {
+                            lmarenaStatus = '<span class="badge badge-warning">Untested</span>';
+                        }
+
+                        tableHtml += `
+                            <tr>
+                                <td>${proxy.url}</td>
+                                <td>${proxy.source}</td>
+                                <td>${new Date(proxy.added).toLocaleString()}</td>
+                                <td>${proxy.lastTested ? new Date(proxy.lastTested).toLocaleString() : 'Never'}</td>
+                                <td>${status}</td>
+                                <td>${lmarenaStatus}</td>
+                            </tr>
+                        `;
+                    });
+
+                    tableHtml += `
+                            </tbody>
+                        </table>
+                    `;
+
+                    document.getElementById(containerId).innerHTML = tableHtml;
+                } else {
+                    document.getElementById(containerId).innerHTML = `<p class="error">Error: ${data.error}</p>`;
+                }
+            } catch (error) {
+                document.getElementById(containerId).innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Fetch new proxies
+        async function fetchProxies() {
+            const fetchBtn = document.getElementById('fetch-btn');
+            const statusMessage = document.getElementById('status-message');
+
+            fetchBtn.disabled = true;
+            statusMessage.className = 'status-message';
+            statusMessage.textContent = 'Fetching proxies...';
+
+            try {
+                const response = await fetch('/api/free-proxy/fetch', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    statusMessage.className = 'status-message status-success';
+                    statusMessage.textContent = data.message;
+
+                    // Reload stats and proxy lists
+                    loadStats();
+                    loadProxies('active');
+                    loadProxies('all');
+                } else {
+                    statusMessage.className = 'status-message status-error';
+                    statusMessage.textContent = `Error: ${data.error}`;
+                }
+            } catch (error) {
+                statusMessage.className = 'status-message status-error';
+                statusMessage.textContent = `Error: ${error.message}`;
+            } finally {
+                fetchBtn.disabled = false;
+            }
+        }
+
+        // Test proxies
+        async function testProxies() {
+            const testBtn = document.getElementById('test-btn');
+            const statusMessage = document.getElementById('status-message');
+
+            testBtn.disabled = true;
+            statusMessage.className = 'status-message';
+            statusMessage.textContent = 'Testing proxies...';
+
+            try {
+                const response = await fetch('/api/free-proxy/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ maxToTest: 50 })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    statusMessage.className = 'status-message status-success';
+                    statusMessage.textContent = data.message;
+
+                    // Reload stats and proxy lists
+                    loadStats();
+                    loadProxies('active');
+                    loadProxies('all');
+                } else {
+                    statusMessage.className = 'status-message status-error';
+                    statusMessage.textContent = `Error: ${data.error}`;
+                }
+            } catch (error) {
+                statusMessage.className = 'status-message status-error';
+                statusMessage.textContent = `Error: ${error.message}`;
+            } finally {
+                testBtn.disabled = false;
+            }
+        }
+
+        // Test proxies with LMArena
+        async function testProxiesWithLMArena() {
+            const testBtn = document.getElementById('test-lmarena-btn');
+            const statusMessage = document.getElementById('status-message');
+
+            testBtn.disabled = true;
+            statusMessage.className = 'status-message';
+            statusMessage.textContent = 'Testing proxies with LMArena...';
+
+            try {
+                const response = await fetch('/api/free-proxy/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        maxToTest: 50,
+                        testWithLMArena: true
+                    })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    statusMessage.className = 'status-message status-success';
+                    statusMessage.textContent = data.message;
+
+                    // Reload stats and proxy lists
+                    loadStats();
+                    loadProxies('active');
+                    loadProxies('all');
+                } else {
+                    statusMessage.className = 'status-message status-error';
+                    statusMessage.textContent = `Error: ${data.error}`;
+                }
+            } catch (error) {
+                statusMessage.className = 'status-message status-error';
+                statusMessage.textContent = `Error: ${error.message}`;
+            } finally {
+                testBtn.disabled = false;
+            }
+        }
+
+        // Rotate proxy
+        async function rotateProxy() {
+            const rotateBtn = document.getElementById('rotate-btn');
+            const statusMessage = document.getElementById('status-message');
+
+            rotateBtn.disabled = true;
+            statusMessage.className = 'status-message';
+            statusMessage.textContent = 'Rotating proxy...';
+
+            try {
+                const response = await fetch('/api/free-proxy/rotate', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    statusMessage.className = 'status-message status-success';
+                    statusMessage.textContent = data.message;
+
+                    // Reload stats
+                    loadStats();
+                } else {
+                    statusMessage.className = 'status-message status-error';
+                    statusMessage.textContent = `Error: ${data.error}`;
+                }
+            } catch (error) {
+                statusMessage.className = 'status-message status-error';
+                statusMessage.textContent = `Error: ${error.message}`;
+            } finally {
+                rotateBtn.disabled = false;
+            }
+        }
+
+        // Rotate LMArena proxy
+        async function rotateLMArenaProxy() {
+            const rotateBtn = document.getElementById('rotate-lmarena-btn');
+            const statusMessage = document.getElementById('status-message');
+
+            rotateBtn.disabled = true;
+            statusMessage.className = 'status-message';
+            statusMessage.textContent = 'Rotating LMArena proxy...';
+
+            try {
+                const response = await fetch('/api/free-proxy/rotate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ requireLMArenaSupport: true })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    statusMessage.className = 'status-message status-success';
+                    statusMessage.textContent = data.message;
+
+                    // Reload stats
+                    loadStats();
+                } else {
+                    statusMessage.className = 'status-message status-error';
+                    statusMessage.textContent = `Error: ${data.error}`;
+                }
+            } catch (error) {
+                statusMessage.className = 'status-message status-error';
+                statusMessage.textContent = `Error: ${error.message}`;
+            } finally {
+                rotateBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

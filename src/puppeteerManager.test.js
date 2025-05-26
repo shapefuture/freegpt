@@ -22,17 +22,18 @@ describe('fetchAvailableModels', () => {
   it('returns models from UI if found', async () => {
     // Mock selectors and model elements
     mockPage.$.mockImplementation((selector) => {
-      if (selector.includes('button[aria-haspopup="listbox"]')) return { click: jest.fn().mockResolvedValue(undefined) };
+      if (selector.includes('button[aria-haspopup="listbox"]'))
+        return { click: jest.fn().mockResolvedValue(undefined) };
       return null;
     });
     mockPage.$.mockImplementation((selector) => {
       if (selector.includes('div[data-radix-collection-item]')) {
         return [
           {
-            evaluate: jest.fn().mockImplementation((fn) => fn({ textContent: 'gpt4' })),
+            evaluate: jest.fn().mockImplementation((fn) => fn({ textContent: 'gpt4' }))
           },
           {
-            evaluate: jest.fn().mockImplementation((fn) => fn({ textContent: 'claude3' })),
+            evaluate: jest.fn().mockImplementation((fn) => fn({ textContent: 'claude3' }))
           }
         ];
       }

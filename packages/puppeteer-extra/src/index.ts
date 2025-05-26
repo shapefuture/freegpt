@@ -248,30 +248,33 @@ export class PuppeteerExtra implements VanillaPuppeteer {
    *
    * Note: This patch only fixes explicitly created pages, implicitly created ones
    * (e.g. through `window.open`) are still subject to this issue. I didn't find a
-   * reliable mitigation for implicitly created pages yet.
-   *
-   * Puppeteer issues:
-   * https://github.com/GoogleChrome/puppeteer/issues/2669
-   * https://github.com/puppeteer/puppeteer/issues/3667
-   * https://github.com/GoogleChrome/puppeteer/issues/386#issuecomment-343059315
-   * https://github.com/GoogleChrome/puppeteer/issues/1378#issue-273733905
+   * good way to intercept those.
    *
    * @private
    */
   private _patchPageCreationMethods(browser: BrowserInternals) {
-    if (!browser._createPageInContext) {
-      debug(
-        'warning: _patchPageCreationMethods failed (no browser._createPageInContext)'
-      )
-      return
+    const originalNewPage = browser.newPage.bind(browser)
+    browser.newPage = async function() {
+      const page = await originalNewPage()
+      // INFO: We need to force about:blank navigation here to make
+      // sure the page target is created before plugins can access it
+      // see https://github.com/puppeteer/puppeteer/issues/1801
+      // and https://github.com/puppeteer/puppeteer/issues/3175
+      await page.goto('about:blank')
+      return page
     }
-    browser._createPageInContext = (function(originalMethod, context) {
-      return async function() {
-        const page = await originalMethod.apply(context, arguments as any)
+
+    const originalCreateIncognitoBrowserContext = browser.createBrowserContext.bind(browser)
+    browser.createBrowserContext = async function() {
+      const context = await originalCreateIncognitoBrowserContext()
+      const originalContextNewPage = context.newPage.bind(context)
+      context.newPage = async function() {
+        const page = await originalContextNewPage()
         await page.goto('about:blank')
         return page
       }
-    })(browser._createPageInContext, browser)
+      return context
+    }
   }
 
   /**
@@ -307,10 +310,11 @@ export class PuppeteerExtra implements VanillaPuppeteer {
    * @private
    */
   public getPluginData(name?: string) {
-    const data = this._plugins
-      .map(p => (Array.isArray(p.data) ? p.data : [p.data]))
-      .reduce((acc, arr) => [...acc, ...arr], [])
-    return name ? data.filter((d: any) => d.name === name) : data
+    if (name) {
+      return this._plugins.filter(p => p.name === name).map(p => p.data)
+    } else {
+      return this._plugins.map(p => p.data)
+    }
   }
 
   /**
@@ -319,7 +323,7 @@ export class PuppeteerExtra implements VanillaPuppeteer {
    * @private
    */
   private getPluginsByProp(prop: string): PuppeteerExtraPlugin[] {
-    return this._plugins.filter(plugin => prop in plugin)
+    return this._plugins.filter(p => prop in p)
   }
 
   /**
@@ -332,12 +336,17 @@ export class PuppeteerExtra implements VanillaPuppeteer {
    * @private
    */
   private resolvePluginDependencies() {
-    // Request missing dependencies from all plugins and flatten to a single Set
-    const missingPlugins = this._plugins
-      .map(p => p._getMissingDependencies(this._plugins))
-      .reduce((combined, list) => {
-        return new Set([...combined, ...list])
-      }, new Set())
+    const missingPlugins = new Set<string>()
+    // Collect all missing dependencies
+    for (const plugin of this._plugins) {
+      if (!plugin.dependencies || !plugin.dependencies.size) continue
+      for (const dep of plugin.dependencies) {
+        // check if the dependency has already been registered (by name)
+        if (!this.pluginNames.includes(dep)) {
+          missingPlugins.add(dep)
+        }
+      }
+    }
     if (!missingPlugins.size) {
       debug('no dependencies are missing')
       return
@@ -491,7 +500,16 @@ export class PuppeteerExtra implements VanillaPuppeteer {
  * puppeteer.use(...)
  */
 const defaultExport: PuppeteerExtra = (() => {
-  return new PuppeteerExtra(...requireVanillaPuppeteer())
+  const instance = new PuppeteerExtra(...requireVanillaPuppeteer())
+  // Import and use the puppeteer-real-browser plugin
+  try {
+    const puppeteerRealBrowser = require('puppeteer-real-browser')
+    instance.use(puppeteerRealBrowser()) // Integrate the plugin
+    debug('puppeteer-real-browser plugin registered')
+  } catch (error) {
+    console.error('Failed to load puppeteer-real-browser plugin:', error)
+  }
+  return instance
 })()
 
 export default defaultExport
